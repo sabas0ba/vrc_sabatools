@@ -1,0 +1,73 @@
+name: Build VPM Listing
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  push:
+    branches:
+      - main
+    # This job deploys both halves of the site, so both halves' sources belong
+    # here. The documentation half is generated from the packages themselves --
+    # their Markdown, their manifests and the figures under Documentation~ --
+    # and without those paths a documentation change lands on main and is never
+    # published.
+    paths:
+      - "source.json"
+      - "Website/**"
+      - "Packages/**/*.md"
+      - "Packages/**/package.json"
+      - "Packages/**/Documentation~/**"
+      - ".github/scripts/build_listing.py"
+      - ".github/scripts/build_docs.py"
+      - ".github/scripts/check_docs.py"
+      - ".github/workflows/build-listing.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two Pages deployments race; queue them instead of cancelling, so a
+# release triggered listing is not dropped by a later docs push.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # No setup-python step: every script here runs in the pinned container
+      # that .github/scripts/run.sh starts, so the runner's interpreter never
+      # takes part. Docker is preinstalled on GitHub-hosted runners.
+      # The only step here that needs the network, and so the only one that
+      # runs with it. See .github/scripts/run.sh.
+      - name: Generate index.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONTAINER_NETWORK: default
+        run: |
+          ./.github/scripts/run.sh .github/scripts/build_listing.py \
+            --source source.json \
+            --output Website/index.json
+          cat Website/index.json
+
+      - name: Render documentation
+        run: |
+          ./.github/scripts/run.sh .github/scripts/build_docs.py
+          ./.github/scripts/run.sh .github/scripts/check_docs.py
+
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: Website
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

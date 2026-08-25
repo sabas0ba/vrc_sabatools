@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SabaTools — VCC Listing</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 3rem 1.25rem 5rem;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    line-height: 1.7;
+  }
+
+  main { max-width: 46rem; margin: 0 auto; }
+
+  h1 { font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -0.01em; }
+  h2 { font-size: 1.15rem; margin: 2.5rem 0 .75rem; }
+
+  .lede { color: var(--muted); margin: 0 0 2rem; }
+
+  .add {
+    display: inline-block;
+    padding: .7rem 1.4rem;
+    border-radius: .5rem;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .add:hover { filter: brightness(1.08); }
+
+  .url-row {
+    display: flex;
+    gap: .5rem;
+    align-items: stretch;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  code, .url {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .875rem;
+  }
+
+  .url {
+    flex: 1 1 20rem;
+    min-width: 0;
+    padding: .55rem .8rem;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: .4rem;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  button.copy {
+    padding: .55rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: .4rem;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: .875rem;
+    cursor: pointer;
+  }
+
+  button.copy:hover { border-color: var(--accent); }
+
+  /* The whole card is the link to that package's documentation. */
+  .pkg {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: .6rem;
+    background: var(--surface);
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 1rem;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color .12s ease, background-color .12s ease;
+  }
+
+  .pkg:hover, .pkg:focus-visible { border-color: var(--accent); }
+  .pkg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .pkg h3 { margin: 0 0 .15rem; font-size: 1.05rem; }
+  .pkg .id { color: var(--muted); font-size: .8rem; }
+  .pkg p { margin: .6rem 0 0; color: var(--muted); font-size: .92rem; }
+
+  /* Says where the card goes, and that it leaves for a new tab. Spelled out
+     rather than left to an icon, because the arrow alone is not an answer to
+     "what happens if I click this". */
+  .pkg .go {
+    margin-top: .75rem;
+    color: var(--accent);
+    font-size: .85rem;
+    font-weight: 600;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: .1rem .5rem;
+    border-radius: 1rem;
+    background: var(--code-bg);
+    font-size: .75rem;
+    color: var(--muted);
+    margin-left: .4rem;
+  }
+
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: .85rem;
+  }
+
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>SabaTools</h1>
+  <p class="lede">VRChat のアバター・ワールド編集用ユーティリティ集の VCC リスティングです。</p>
+
+  <a class="add" id="add-button" href="#">VCC に追加</a>
+
+  <div class="url-row">
+    <div class="url" id="listing-url">読み込み中…</div>
+    <button class="copy" id="copy-button" type="button">コピー</button>
+  </div>
+
+  <h2>収録パッケージ</h2>
+  <div id="packages">読み込み中…</div>
+
+  <footer>
+    <a href="docs/index.html">ドキュメント</a> ·
+    <a href="https://github.com/sabas0ba/vrc_sabatools">GitHub リポジトリ</a> ·
+    <a href="index.json">index.json</a>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var listingUrl = new URL('index.json', location.href).href;
+
+  var urlNode = document.getElementById('listing-url');
+  var addButton = document.getElementById('add-button');
+  var copyButton = document.getElementById('copy-button');
+  var packagesNode = document.getElementById('packages');
+
+  function text(tag, className, value) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (value != null) node.textContent = value;
+    return node;
+  }
+
+  function latestVersion(versions) {
+    // index.json is written newest-first by the build script.
+    var keys = Object.keys(versions);
+    return keys.length ? versions[keys[0]] : null;
+  }
+
+  function render(listing) {
+    var url = listing.url || listingUrl;
+    urlNode.textContent = url;
+    addButton.href = 'vcc://vpm/addRepo?url=' + encodeURIComponent(url);
+
+    var packages = listing.packages || {};
+    var ids = Object.keys(packages);
+
+    packagesNode.textContent = '';
+
+    if (!ids.length) {
+      packagesNode.appendChild(
+        text('p', null, 'まだリリースがありません。タグを打つと自動で掲載されます。'));
+      return;
+    }
+
+    ids.forEach(function (id) {
+      var manifest = latestVersion(packages[id].versions || {});
+      if (!manifest) return;
+
+      var name = manifest.displayName || id;
+
+      // Straight to that package's page in the documentation site, in a new
+      // tab: someone reading the listing is usually part way through adding
+      // the repository to VCC, and losing this page would interrupt that.
+      var card = text('a', 'pkg');
+      card.href = 'docs/' + encodeURIComponent(id) + '/index.html';
+      card.target = '_blank';
+      card.rel = 'noopener';
+      card.setAttribute('aria-label', name + ' のドキュメントを開く (新しいタブ)');
+
+      var heading = text('h3', null, name);
+      heading.appendChild(text('span', 'badge', 'v' + manifest.version));
+      card.appendChild(heading);
+
+      card.appendChild(text('div', 'id', id));
+
+      if (manifest.description) {
+        card.appendChild(text('p', null, manifest.description));
+      }
+
+      card.appendChild(text('div', 'go', 'ドキュメントを開く ↗'));
+
+      packagesNode.appendChild(card);
+    });
+  }
+
+  copyButton.addEventListener('click', function () {
+    navigator.clipboard.writeText(urlNode.textContent).then(function () {
+      copyButton.textContent = 'コピーしました';
+      setTimeout(function () { copyButton.textContent = 'コピー'; }, 1600);
+    });
+  });
+
+  fetch('index.json', { cache: 'no-cache' })
+    .then(function (response) {
+      if (!response.ok) throw new Error(response.status + ' ' + response.statusText);
+      return response.json();
+    })
+    .then(render)
+    .catch(function (error) {
+      urlNode.textContent = listingUrl;
+      addButton.href = 'vcc://vpm/addRepo?url=' + encodeURIComponent(listingUrl);
+      packagesNode.textContent = '';
+      packagesNode.appendChild(
+        text('p', null, 'index.json を読み込めませんでした (' + error.message + ')。'));
+    });
+})();
+</script>
+</body>
+</html>

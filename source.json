@@ -1,0 +1,16 @@
+{
+  "name": "SabaTools",
+  "id": "io.github.sabas0ba.sabatools",
+  "url": "https://sabas0ba.github.io/vrc_sabatools/index.json",
+  "author": "sabas0ba",
+  "description": "VRChat 向けのアバター・ワールド編集用ユーティリティ集。",
+  "infoLink": {
+    "url": "https://github.com/sabas0ba/vrc_sabatools",
+    "text": "GitHub リポジトリ"
+  },
+  "bannerUrl": "",
+  "githubRepo": "sabas0ba/vrc_sabatools",
+  "packages": [
+    "io.github.sabas0ba.sabatools.inspect"
+  ]
+}

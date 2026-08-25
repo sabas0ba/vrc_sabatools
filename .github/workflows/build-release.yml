@@ -1,0 +1,202 @@
+name: Build Release
+
+# Tag formats:
+#   v0.1.0                            -> the only package under Packages/
+#   io.github.sabas0ba.sabatools.inspect/v0.1.0      -> that specific package
+on:
+  push:
+    tags:
+      - "v*"
+      - "*/v*"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package id (e.g. io.github.sabas0ba.sabatools.inspect). Leave empty to auto-detect."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.resolve.outputs.package }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Resolve package and version
+        id: resolve
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+        run: |
+          set -euo pipefail
+
+          package=""
+          version=""
+
+          if [ "$REF_TYPE" = "tag" ]; then
+            tag="$REF_NAME"
+            case "$tag" in
+              */*)
+                package="${tag%/*}"
+                version="${tag##*/}"
+                ;;
+              *)
+                version="$tag"
+                ;;
+            esac
+            version="${version#v}"
+          fi
+
+          if [ -n "$INPUT_PACKAGE" ]; then
+            package="$INPUT_PACKAGE"
+          fi
+
+          if [ -z "$package" ]; then
+            # No package in the tag: only unambiguous when a single one exists.
+            mapfile -t candidates < <(find Packages -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+            if [ "${#candidates[@]}" -ne 1 ]; then
+              echo "::error::Cannot infer the package from tag '$REF_NAME'. Found ${#candidates[@]} packages; tag as '<package-id>/v<version>' instead."
+              exit 1
+            fi
+            package="${candidates[0]}"
+          fi
+
+          manifest="Packages/$package/package.json"
+          if [ ! -f "$manifest" ]; then
+            echo "::error::$manifest not found."
+            exit 1
+          fi
+
+          manifest_version="$(jq -r '.version' "$manifest")"
+
+          if [ -z "$version" ]; then
+            version="$manifest_version"
+          fi
+
+          if [ "$manifest_version" != "$version" ]; then
+            echo "::error::Tag version ($version) does not match $manifest (.version = $manifest_version). Bump the manifest first."
+            exit 1
+          fi
+
+          {
+            echo "package=$package"
+            echo "version=$version"
+            echo "manifest=$manifest"
+            echo "zip_name=$package-$version.zip"
+            echo "json_name=$package-$version.json"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Releasing $package $version"
+
+      - name: Determine tag
+        id: tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          PACKAGE: ${{ steps.resolve.outputs.package }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "$REF_TYPE" = "tag" ]; then
+            echo "name=$REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            # Manual runs create the tag from the manifest version.
+            echo "name=$PACKAGE/v$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package zip
+        env:
+          PACKAGE: ${{ steps.resolve.outputs.package }}
+          ZIP_NAME: ${{ steps.resolve.outputs.zip_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          # package.json must sit at the root of the archive for VCC.
+          #
+          # Documentation~/images is excluded: the figures are for the README on
+          # GitHub and for the documentation site, and shipping them would put
+          # them in every project that installs the package for nothing.
+          ( cd "Packages/$PACKAGE" && zip -q -r "$GITHUB_WORKSPACE/build/$ZIP_NAME" . \
+              -x '.git/*' '.gitignore' 'Documentation~/images/*' )
+          unzip -l "build/$ZIP_NAME" | head -n 40
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.name }}
+          PACKAGE: ${{ steps.resolve.outputs.package }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+          ZIP_NAME: ${{ steps.resolve.outputs.zip_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "build/$ZIP_NAME" --clobber
+          else
+            gh release create "$TAG" "build/$ZIP_NAME" \
+              --title "$PACKAGE $VERSION" \
+              --notes "VCC からインストールできます: https://sabas0ba.github.io/vrc_sabatools/index.json" \
+              --latest
+          fi
+
+      - name: Attach VPM manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.name }}
+          MANIFEST: ${{ steps.resolve.outputs.manifest }}
+          ZIP_NAME: ${{ steps.resolve.outputs.zip_name }}
+          JSON_NAME: ${{ steps.resolve.outputs.json_name }}
+        run: |
+          set -euo pipefail
+
+          # Read the download URL back from the release rather than composing
+          # it, so tags containing slashes stay correct.
+          url="$(gh release view "$TAG" --json assets \
+                 --jq ".assets[] | select(.name == \"$ZIP_NAME\") | .url")"
+
+          if [ -z "$url" ]; then
+            echo "::error::Could not find $ZIP_NAME on release $TAG."
+            exit 1
+          fi
+
+          sha="$(sha256sum "build/$ZIP_NAME" | cut -d' ' -f1)"
+
+          jq --arg url "$url" --arg sha "$sha" '. + {url: $url, zipSHA256: $sha}' \
+            "$MANIFEST" > "build/$JSON_NAME"
+
+          cat "build/$JSON_NAME"
+          gh release upload "$TAG" "build/$JSON_NAME" --clobber
+
+  # Asks the listing workflow to run on the default branch rather than calling
+  # it from here.
+  #
+  # A reusable workflow inherits the caller's ref, so calling it from a tag push
+  # made the Pages deployment come from refs/tags/v0.1.0. The github-pages
+  # environment only allows main, so it was rejected before a step ran:
+  #
+  #   Tag "v0.1.0" is not allowed to deploy to github-pages
+  #   due to environment protection rules.
+  #
+  # Dispatching on main is also the more correct ref: the listing is built from
+  # the Releases API, while the page around it comes from Website/, and that
+  # should be main's copy rather than whatever the tag happened to freeze.
+  #
+  # Loosening the environment to accept v* tags would have worked too, at the
+  # cost of widening what may deploy the site.
+  listing:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Rebuild the VPM listing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          gh workflow run build-listing.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH"

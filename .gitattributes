@@ -1,0 +1,17 @@
+# Shell scripts run inside Linux containers and on CI runners. With
+# core.autocrlf=true a Windows checkout would hand them to /bin/sh with CRLF
+# line endings, which fails as "bad interpreter".
+*.sh text eol=lf
+
+# Unity resolves assets by the GUID in the .meta file. Treating these as text
+# keeps diffs reviewable; forcing LF keeps the GUIDs byte-identical whatever
+# platform wrote them.
+*.meta text eol=lf
+*.asmdef text eol=lf
+*.shader text eol=lf
+*.cginc text eol=lf
+
+# The documentation figures are generated and then compared byte for byte
+# against the generator's output in CI. A CRLF checkout would fail that check
+# on Windows even with nothing changed.
+*.svg text eol=lf
