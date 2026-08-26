@@ -15,3 +15,8 @@
 # against the generator's output in CI. A CRLF checkout would fail that check
 # on Windows even with nothing changed.
 *.svg text eol=lf
+
+# fetch-inner.sh reads the SDK lock files field by field with `read -r`. A CRLF
+# checkout would leave the URL with a trailing carriage return, so the download
+# fails for a reason that never appears in the file itself.
+*.lock text eol=lf
