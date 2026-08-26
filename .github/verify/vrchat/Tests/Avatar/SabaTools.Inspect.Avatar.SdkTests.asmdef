@@ -5,7 +5,7 @@
         "SabaTools.Inspect.Core.Editor",
         "SabaTools.Inspect.Avatar.Editor",
         "VRC.SDK3A",
-        "VRCSDKBase",
+        "VRC.SDKBase",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
@@ -16,7 +16,9 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "nunit.framework.dll"
+        "nunit.framework.dll",
+        "VRCSDKBase.dll",
+        "VRCSDK3A.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
