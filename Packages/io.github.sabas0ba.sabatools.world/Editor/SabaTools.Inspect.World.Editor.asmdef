@@ -5,7 +5,7 @@
         "SabaTools.Inspect.Core.Editor",
         "VRC.SDK3",
         "VRC.SDK3.Editor",
-        "VRCSDKBase",
+        "VRC.SDKBase",
         "VRC.Udon"
     ],
     "includePlatforms": [
