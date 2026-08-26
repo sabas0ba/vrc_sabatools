@@ -96,16 +96,15 @@ Test Runner を回すか、`unity.yml` の `editmode` job と同じ手順でプ�
 トピックは未設定である。`vrchat` / `vpm` / `unity-editor` / `vrchat-avatars` /
 `vrchat-worlds` あたりが既存 2 リポジトリと揃う。
 
-なお push 後も Actions の実行が 0 件のままである。4 つの workflow はいずれも `active`
-として登録され、`actions/permissions` も `enabled: true` を返すので、原因は未特定で
-ある。`workflow_dispatch` で手動起動して切り分けること。
+リポジトリ作成直後の push では Actions が起動しなかったが、その後の push では
+`Verify` と `Unity` がいずれも success で完走している。
 
-### 3. GitHub Pages の有効化
+### 3. GitHub Pages の有効化 — 完了 (2026-08-27)
 
-Settings → Pages → Source を **GitHub Actions** にする。これを行わないと
-`build-listing.yml` の deploy が失敗する。`github-pages` environment は既定で main のみ
-許可され、`build-release.yml` はそれを前提に listing を main 上で dispatch する構造に
-なっている (理由は `build-release.yml` のコメントにある)。
+Source を **GitHub Actions** (`build_type: workflow`) に設定した。公開先は
+<https://sabas0ba.github.io/vrc_sabatools/> である。`github-pages` environment は既定で
+main のみ許可され、`build-release.yml` はそれを前提に listing を main 上で dispatch する
+構造になっている (理由は `build-release.yml` のコメントにある)。
 
 ### 4. Unity licence (任意)
 
