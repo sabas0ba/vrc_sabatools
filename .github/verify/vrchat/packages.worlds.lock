@@ -1,0 +1,15 @@
+# Pinned VRChat SDK packages for the Worlds verification project.
+#
+# Fields: <package id> <version> <sha256 of the zip> <download url>
+#
+# Versions, URLs and hashes are taken from the official VPM listing
+# (https://packages.vrchat.com/official). Pinning them here means the
+# verification project is reproducible from this file alone, rather than from
+# whatever VCC or ALCOM happens to have cached on the machine that runs it.
+#
+# To move to a newer SDK, replace the three changed fields on the line and
+# re-run fetch.sh; a mismatched hash fails the fetch rather than silently
+# installing something else.
+
+com.vrchat.base   3.10.4 86e8187a7d8f5fb5a54d442b64d09899be2fab2ef1b7822a3c202549ff05ff6b https://github.com/vrchat/packages/releases/download/3.10.4/com.vrchat.base-3.10.4.zip
+com.vrchat.worlds 3.10.4 a21cdda0202ce05a33f0892eb6cfb0425e1429a4d1cb5bdcceee7994116017aa https://github.com/vrchat/packages/releases/download/3.10.4/com.vrchat.worlds-3.10.4.zip

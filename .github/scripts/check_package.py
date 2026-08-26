@@ -40,8 +40,20 @@ if os.path.exists(changelog):
 with open(os.path.join(repo, "source.json"), encoding="utf-8") as handle:
     source = json.load(handle)
 
-if manifest.get("name") not in (source.get("packages") or []):
+listed = source.get("packages") or []
+if manifest.get("name") not in listed:
     problems.append(f"{manifest.get('name')} is not listed in source.json packages")
+
+# A dependency on a sibling package in this repository has to name one that
+# exists, or VCC resolves it against the wider VPM world and installs
+# something else -- or nothing at all, with the package silently inert.
+for dependency in (manifest.get("vpmDependencies") or {}):
+    if not dependency.startswith(source.get("id", "\0")):
+        continue
+    if dependency not in listed:
+        problems.append(
+            f"vpmDependencies names '{dependency}', which is not a package in this repository"
+        )
 
 # Every non-tilde file Unity imports needs a .meta, or GUIDs churn per install.
 missing = []

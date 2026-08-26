@@ -1,0 +1,28 @@
+{
+    "name": "SabaTools.Inspect.Avatar.Editor",
+    "rootNamespace": "SabaTools.Inspect.Avatar",
+    "references": [
+        "SabaTools.Inspect.Core.Editor",
+        "VRC.SDK3A",
+        "VRC.SDK3A.Editor",
+        "VRCSDKBase",
+        "VRC.SDK3.Dynamics.PhysBone"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.vrchat.avatars",
+            "expression": "",
+            "define": "SABATOOLS_VRC_AVATARS"
+        }
+    ],
+    "noEngineReferences": false
+}

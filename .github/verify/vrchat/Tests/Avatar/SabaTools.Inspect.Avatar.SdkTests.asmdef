@@ -1,8 +1,11 @@
 {
-    "name": "SabaTools.Inspect.CITests",
-    "rootNamespace": "SabaTools.Inspect.CITests",
+    "name": "SabaTools.Inspect.Avatar.SdkTests",
+    "rootNamespace": "SabaTools.Inspect.Avatar.SdkTests",
     "references": [
         "SabaTools.Inspect.Core.Editor",
+        "SabaTools.Inspect.Avatar.Editor",
+        "VRC.SDK3A",
+        "VRCSDKBase",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

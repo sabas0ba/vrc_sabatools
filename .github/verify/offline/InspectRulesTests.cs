@@ -12,6 +12,8 @@
 using System;
 using System.Collections.Generic;
 using SabaTools.Inspect;
+using SabaTools.Inspect.Avatar;
+using SabaTools.Inspect.World;
 
 internal static class InspectRulesTests
 {
@@ -34,6 +36,10 @@ internal static class InspectRulesTests
         MarkdownCarriesStatsAndFindings();
         MarkdownEscapesTableSeparators();
         SeverityCountsMatchTheItems();
+        AModuleTakesOverTheDescriptorDiagnosis();
+        ExpressionParameterBitsAreCostedPerType();
+        NearlyFullIsAboutRoomForOneMoreParameter();
+        RespawnHeightIsComparedAgainstGeometry();
 
         if (_failures > 0)
         {
@@ -270,6 +276,82 @@ internal static class InspectRulesTests
         AreEqual(2, report.WarningCount, "warnings");
         AreEqual(1, report.Count(InspectionSeverity.Info), "infos");
         AreEqual(string.Empty, report.Items[0].Path, "a null path becomes empty");
+    }
+
+    // -----------------------------------------------------------------------
+    // Module hand-off
+    // -----------------------------------------------------------------------
+
+    private static void AModuleTakesOverTheDescriptorDiagnosis()
+    {
+        // With an SDK module running, the core checklist must stop guessing at
+        // descriptors by type name — otherwise every avatar without one gets
+        // told twice, once vaguely and once precisely.
+        var stats = new StatsSnapshot { SkinnedMeshRendererCount = 1 };
+
+        IsTrue(Mentions(ChecklistRules.Evaluate(stats, InspectMode.Avatar, moduleHandled: false),
+            "VRCAvatarDescriptor"), "without a module the core check speaks");
+        IsFalse(Mentions(ChecklistRules.Evaluate(stats, InspectMode.Avatar, moduleHandled: true),
+            "VRCAvatarDescriptor"), "with a module the core check stays quiet");
+
+        var world = new StatsSnapshot();
+        IsTrue(Mentions(ChecklistRules.Evaluate(world, InspectMode.World, moduleHandled: false),
+            "VRCSceneDescriptor"), "without a module the core check speaks");
+        IsFalse(Mentions(ChecklistRules.Evaluate(world, InspectMode.World, moduleHandled: true),
+            "VRCSceneDescriptor"), "with a module the core check stays quiet");
+
+        // Broken references are core's own finding and belong in the report
+        // whether or not a module is running.
+        var broken = new StatsSnapshot { MissingScriptCount = 1 };
+        AreEqual(1, CountOf(ChecklistRules.Evaluate(broken, InspectMode.Avatar, true),
+            InspectionSeverity.Error), "reference errors survive the hand-off");
+    }
+
+    // -----------------------------------------------------------------------
+    // Avatar limits (sabatools.avatar)
+    // -----------------------------------------------------------------------
+
+    private static void ExpressionParameterBitsAreCostedPerType()
+    {
+        AreEqual(1, AvatarLimits.BitsFor("Bool"), "a bool costs one bit");
+        AreEqual(8, AvatarLimits.BitsFor("Int"), "an int costs eight");
+        AreEqual(8, AvatarLimits.BitsFor("Float"), "a float costs eight");
+
+        // An SDK that adds a value type must be over-costed, never under: a
+        // tool that reports room the avatar does not have is worse than one
+        // that reports less room than it has.
+        AreEqual(8, AvatarLimits.BitsFor("SomeFutureType"), "unknown types cost the widest");
+        AreEqual(8, AvatarLimits.BitsFor(null), "a null type name costs the widest");
+
+        AreEqual(256, AvatarLimits.ExpressionParameterBits, "the published budget");
+        AreEqual(1.0, AvatarLimits.BudgetFraction(256), "a full budget is 1.0");
+        AreEqual(0.5, AvatarLimits.BudgetFraction(128), "half a budget is 0.5");
+    }
+
+    private static void NearlyFullIsAboutRoomForOneMoreParameter()
+    {
+        IsFalse(AvatarLimits.IsNearlyFull(0), "an empty budget is not nearly full");
+        IsFalse(AvatarLimits.IsNearlyFull(248), "exactly one Int still fits");
+        IsTrue(AvatarLimits.IsNearlyFull(249), "one Int no longer fits");
+        IsTrue(AvatarLimits.IsNearlyFull(256), "a full budget is nearly full");
+        IsFalse(AvatarLimits.IsNearlyFull(257), "over budget is an error, not a warning");
+    }
+
+    // -----------------------------------------------------------------------
+    // World limits (sabatools.world)
+    // -----------------------------------------------------------------------
+
+    private static void RespawnHeightIsComparedAgainstGeometry()
+    {
+        IsTrue(WorldLimits.RespawnIsAboveGeometry(respawnHeightY: 0f, lowestGeometryY: -10f),
+            "a respawn plane above the floor catches standing players");
+        IsFalse(WorldLimits.RespawnIsAboveGeometry(respawnHeightY: -100f, lowestGeometryY: -10f),
+            "a respawn plane below the floor is correct");
+        IsFalse(WorldLimits.RespawnIsAboveGeometry(-10f, -10f),
+            "exactly level is not above");
+
+        AreEqual(-11.0, WorldLimits.SuggestedRespawnHeight(-10f),
+            "the suggestion clears the lowest geometry");
     }
 
     // -----------------------------------------------------------------------

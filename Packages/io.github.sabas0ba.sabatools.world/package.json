@@ -1,0 +1,29 @@
+{
+  "name": "io.github.sabas0ba.sabatools.world",
+  "displayName": "SabaTools Inspect for Worlds",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "SabaTools Inspect にワールド固有の検査を追加します。VRCSceneDescriptor を実際の型で読み、Spawn の妥当性、RespawnHeightY、ReferenceCamera、Udon Behaviour / Pickup / Station / Mirror の数と配置を検査します。ワールド用プロジェクトにのみ導入してください。",
+  "author": {
+    "name": "sabas0ba",
+    "url": "https://github.com/sabas0ba"
+  },
+  "license": "MIT",
+  "licensesUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/LICENSE",
+  "documentationUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/Packages/io.github.sabas0ba.sabatools.world/README.md",
+  "changelogUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/Packages/io.github.sabas0ba.sabatools.world/CHANGELOG.md",
+  "vpmDependencies": {
+    "io.github.sabas0ba.sabatools.core": ">=0.1.0",
+    "com.vrchat.worlds": ">=3.10.4"
+  },
+  "keywords": [
+    "vrchat",
+    "world",
+    "editor",
+    "utility",
+    "inspection",
+    "udon",
+    "spawn",
+    "mirror"
+  ]
+}

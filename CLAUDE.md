@@ -19,28 +19,61 @@ Claude Code が本リポジトリで作業する際の補足。
 
 ## 非破壊であること
 
-`io.github.sabas0ba.sabatools.inspect` は検査専用のパッケージであり、シーン・アセット・
-選択状態のいずれも変更しない。これはこのパッケージの唯一の強い約束であり、
-`InspectApiTests.ScanningLeavesTheHierarchyUntouched` が検査している。
+収録パッケージはいずれも検査専用であり、シーン・アセット・選択状態のいずれも変更
+しない。これは唯一の強い約束であり、`InspectApiTests.ScanningLeavesTheHierarchyUntouched`
+および各モジュールの `ScanningLeavesThe...Untouched` が検査している。
+`InspectionModule` の実装もこの約束を守る。1 つのモジュールが破れば全体が破れる。
 
-書き込みを伴う機能 (一括設定、最適化など) を追加する場合は、本パッケージに足さず
-別パッケージとして分ける。検査ツールが書き込みうるという状態にしないこと。
+書き込みを伴う機能 (一括設定、最適化など) を追加する場合は、これらに足さず別パッケージ
+として分ける。検査ツールが書き込みうるという状態にしないこと。
+
+## パッケージの分割
+
+パッケージは対象別に 3 つある。この境界は VRChat SDK の制約そのものであり、動かさない。
+
+| パッケージ | vpmDependencies | 役割 |
+| --- | --- | --- |
+| `sabatools.core` | なし | 収集・レポート・ウィンドウ・拡張点 |
+| `sabatools.avatar` | core, `com.vrchat.avatars` | `VRCAvatarDescriptor` を型で読む検査 |
+| `sabatools.world` | core, `com.vrchat.worlds` | `VRCSceneDescriptor` を型で読む検査 |
+
+- **core に SDK 依存を持ち込まない**。`vpmDependencies` に VRChat SDK を足した時点で、
+  core を入れた全プロジェクトにその SDK が入る。両 SDK の同居は想定されていない
+- **依存の矢印は avatar → core / world → core の一方向のみ**。core は両モジュールの
+  アセンブリを参照せず、`UnityEditor.TypeCache` で `InspectionModule` の派生型を拾う。
+  core 側に avatar / world の asmdef 参照を足さないこと
+- **分割の軸は対象であり、ツールの種類ではない**。ツールを増やす場合は既存 3 パッケージ
+  のいずれかにフォルダと名前空間を足す。パッケージを増やすのは、新しい SDK 依存が
+  生じたときだけである
 
 ## Editor/Core の純粋性
 
-`Packages/*/Editor/Core` には `using UnityEngine` / `using UnityEditor` を持ち込まない。
-この分離があるために、判定のしきい値やレポート生成を Unity 無しで実行して検証できる。
-`verify.sh` はこの制約自体を検査するので、Unity の型が必要になった時点でその処理は
-`Editor` 直下に置くべきものである。
+`Packages/*/Editor/Core` には `using UnityEngine` / `using UnityEditor` / `using VRC` を
+持ち込まない。この分離があるために、判定のしきい値やレポート生成を Unity 無しで実行して
+検証できる。`verify.sh` はこの制約自体を検査するので、Unity の型が必要になった時点で
+その処理は `Editor` 直下に置くべきものである。
+
+avatar / world パッケージではこの制約の重みが core より大きい。`verify.sh` が届くのは
+両パッケージの `Editor/Core` だけであり、それ以外は実 SDK のレーンでしか検証されない。
+新しい判定を足すときは、まず純粋な計算として `Editor/Core` に書けないか検討すること。
 
 検査を通すために検査自体を削除しない。
 
 ## VRChat SDK への依存
 
-VPM 依存を宣言していない。SDK の有無にかかわらず、アバター用・ワールド用いずれの
-プロジェクトでも導入できることが要件である。SDK コンポーネントは
-`VrcComponentCensus` が型名で数えており、asmdef 参照や `defineConstraints` を
+`sabatools.core` は VPM 依存を宣言していない。SDK の有無にかかわらず、アバター用・
+ワールド用いずれのプロジェクトでも導入できることが要件である。SDK コンポーネントは
+`VrcComponentCensus` が型名で数えており、core 側に asmdef 参照や `defineConstraints` を
 足すとこの要件が壊れる。
+
+avatar / world の `vpmDependencies` は SDK の**下限**のみを宣言する (`>=3.10.4`)。VPM は
+範囲指定しか書けず、厳密に固定すると利用者側の SDK 更新を壊す。厳密な固定は
+`.github/verify/vrchat/packages.<lane>.lock` の URL + SHA256 が担う。この二段構えを
+崩さないこと。
+
+モジュールが読む SDK のフィールド名は、実 SDK のレーンでしか検証されない。SDK の enum
+は値名 (`ToString()`) で比較しており、SDK 更新で値が増えてもコンパイルエラーにならない。
+新しいフィールドを読み始める場合は、対応するレーンのテストを同時に足すこと。
 
 ## パフォーマンス参考値
 
@@ -55,6 +88,9 @@ GitHub Actions は SHA、コンテナイメージは digest、nixpkgs はリビ�
 
 ## 変更後の検証
 
-`./.github/verify/verify.sh` を通すこと。ファイルを追加した場合は
-`.github/scripts/run.sh .github/scripts/gen_meta.py` で `.meta` を生成してから
-コミットする。
+`./.github/verify/verify.sh` を通すこと。avatar / world パッケージに手を入れた場合は
+`./.github/verify/vrchat/run-tests.sh <avatars|worlds>` も実行する。前者はこの 2 つの
+パッケージの `Editor/Core` しか見ていないため、通っても SDK 依存部分は未検証である。
+
+ファイルを追加した場合は `.github/scripts/run.sh .github/scripts/gen_meta.py` で
+`.meta` を生成してからコミットする。

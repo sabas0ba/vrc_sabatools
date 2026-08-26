@@ -99,7 +99,15 @@ namespace SabaTools.Inspect
         /// aggregates with no path — the per-object findings come from the
         /// scanner, which is the half that needs Unity.
         /// </summary>
-        public static List<InspectionItem> Evaluate(StatsSnapshot stats, InspectMode mode)
+        /// <param name="moduleHandled">
+        /// True when an SDK-aware module is running for this mode. The
+        /// descriptor checks below are then suppressed: they can only detect a
+        /// descriptor by type name, and saying "not found (or the SDK is not
+        /// installed)" next to a module that read the real type is worse than
+        /// saying nothing.
+        /// </param>
+        public static List<InspectionItem> Evaluate(
+            StatsSnapshot stats, InspectMode mode, bool moduleHandled = false)
         {
             var items = new List<InspectionItem>();
 
@@ -107,11 +115,11 @@ namespace SabaTools.Inspect
 
             if (mode == InspectMode.Avatar)
             {
-                AddAvatarItems(stats, items);
+                AddAvatarItems(stats, items, moduleHandled);
             }
             else if (mode == InspectMode.World)
             {
-                AddWorldItems(stats, items);
+                AddWorldItems(stats, items, moduleHandled);
             }
 
             if (stats.UnknownTextureFormatCount > 0)
@@ -167,9 +175,10 @@ namespace SabaTools.Inspect
             }
         }
 
-        private static void AddAvatarItems(StatsSnapshot stats, List<InspectionItem> items)
+        private static void AddAvatarItems(
+            StatsSnapshot stats, List<InspectionItem> items, bool moduleHandled)
         {
-            if (!stats.HasAvatarDescriptor)
+            if (!moduleHandled && !stats.HasAvatarDescriptor)
             {
                 items.Add(new InspectionItem("Avatar", InspectionSeverity.Warning,
                     "No VRCAvatarDescriptor found on the target. Uploading requires one " +
@@ -193,9 +202,10 @@ namespace SabaTools.Inspect
             }
         }
 
-        private static void AddWorldItems(StatsSnapshot stats, List<InspectionItem> items)
+        private static void AddWorldItems(
+            StatsSnapshot stats, List<InspectionItem> items, bool moduleHandled)
         {
-            if (!stats.HasSceneDescriptor)
+            if (!moduleHandled && !stats.HasSceneDescriptor)
             {
                 items.Add(new InspectionItem("World", InspectionSeverity.Warning,
                     "No VRCSceneDescriptor found on the target. A world scene needs one " +

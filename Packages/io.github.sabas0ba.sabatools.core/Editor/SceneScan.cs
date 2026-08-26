@@ -37,43 +37,116 @@ namespace SabaTools.Inspect.Editors
                 },
             };
 
-            StatsCollector.Collect(roots, result.Stats);
+            StatsCollector.Collect(roots, stats);
             foreach (GameObject root in roots)
             {
                 if (root != null)
                 {
                     VrcComponentCensus.Collect(
-                        root.GetComponentsInChildren<Component>(true), result.Stats);
+                        root.GetComponentsInChildren<Component>(true), stats);
                 }
             }
-            result.Textures = TextureUsageCollector.Collect(roots, result.Stats);
+            result.Textures = TextureUsageCollector.Collect(roots, stats);
 
             // Runs before Evaluate: the aggregate findings quote counts this
             // scanner is the one to fill in.
             var referenceItems = new List<InspectionItem>();
-            MissingReferenceScanner.Collect(roots, result.Stats, referenceItems, result.Locations);
+            MissingReferenceScanner.Collect(roots, stats, referenceItems, result.Locations);
 
-            InspectMode mode = Resolve(requestedMode, result.Stats);
+            List<InspectionModule> claimants = Claimants(roots);
+            InspectMode mode = Resolve(requestedMode, stats, claimants);
             result.Report.Mode = mode;
-            result.Report.Items.AddRange(ChecklistRules.Evaluate(result.Stats, mode));
+
+            // A module for the resolved mode owns the SDK diagnosis, so the
+            // core checklist stays quiet about descriptors it can only detect
+            // by type name. Without one, that fallback is all there is.
+            var running = new List<InspectionModule>();
+            foreach (InspectionModule module in claimants)
+            {
+                if (module.Mode == mode)
+                {
+                    running.Add(module);
+                }
+            }
+
+            result.Report.Items.AddRange(
+                ChecklistRules.Evaluate(stats, mode, moduleHandled: running.Count > 0));
             result.Report.Items.AddRange(referenceItems);
 
             FillStatRows(result);
+
+            // Module rows and findings land after the core ones, so the report
+            // reads core first and SDK specifics after.
+            var context = new InspectionContext(roots, result.Report, result.Locations);
+            foreach (InspectionModule module in running)
+            {
+                try
+                {
+                    module.Inspect(context);
+                }
+                catch (System.Exception exception)
+                {
+                    result.Report.Items.Add(new InspectionItem(
+                        "Modules", InspectionSeverity.Warning,
+                        module.DisplayName + " failed and its checks were skipped: " +
+                        exception.Message, string.Empty));
+                }
+            }
+
             return result;
         }
 
+        /// <summary>Every installed module that recognises these roots.</summary>
+        private static List<InspectionModule> Claimants(GameObject[] roots)
+        {
+            var claimants = new List<InspectionModule>();
+            foreach (InspectionModule module in ModuleRegistry.All())
+            {
+                bool detected;
+                try
+                {
+                    detected = module.Detect(roots);
+                }
+                catch (System.Exception exception)
+                {
+                    Debug.LogWarning(
+                        "[SabaTools] " + module.DisplayName + " threw during detection: " +
+                        exception.Message);
+                    continue;
+                }
+                if (detected)
+                {
+                    claimants.Add(module);
+                }
+            }
+            return claimants;
+        }
+
         /// <summary>
-        /// Auto resolves from what was found: an avatar descriptor wins over a
-        /// scene descriptor, because a world scene rarely contains an avatar
-        /// while an avatar project's scene may contain both. With neither —
-        /// the SDK being absent included — the result is Generic.
+        /// Resolves Auto: an installed module that recognised the content
+        /// decides, otherwise the type-name census does, and with neither — the
+        /// SDK being absent included — the result is Generic.
         /// </summary>
-        internal static InspectMode Resolve(InspectMode requested, StatsSnapshot stats)
+        internal static InspectMode Resolve(
+            InspectMode requested, StatsSnapshot stats, List<InspectionModule> claimants)
         {
             if (requested != InspectMode.Auto)
             {
                 return requested;
             }
+
+            // An installed module recognising the content is the strongest
+            // signal there is: it looked at the real SDK type rather than at a
+            // type name. Order decides between two claimants.
+            if (claimants != null && claimants.Count > 0)
+            {
+                return claimants[0].Mode;
+            }
+
+            // No module, so fall back to what the type-name census saw. An
+            // avatar descriptor wins over a scene descriptor, because a world
+            // scene rarely contains an avatar while an avatar project's scene
+            // may contain both.
             if (stats.HasAvatarDescriptor)
             {
                 return InspectMode.Avatar;

@@ -1,0 +1,26 @@
+{
+  "name": "io.github.sabas0ba.sabatools.core",
+  "displayName": "SabaTools Inspect Core",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "アバター・ワールドの非破壊検査ツールの基盤。統計 (ポリゴン数・マテリアル・テクスチャ VRAM 推定など)、Missing 参照の検出、レポートの Markdown 書き出しを EditorWindow で行います。VRChat SDK に依存しないため、アバター用・ワールド用どちらのプロジェクトにも導入できます。SDK 固有の検査は sabatools.avatar / sabatools.world が追加します。",
+  "author": {
+    "name": "sabas0ba",
+    "url": "https://github.com/sabas0ba"
+  },
+  "license": "MIT",
+  "licensesUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/LICENSE",
+  "documentationUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/Packages/io.github.sabas0ba.sabatools.core/README.md",
+  "changelogUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/Packages/io.github.sabas0ba.sabatools.core/CHANGELOG.md",
+  "vpmDependencies": {},
+  "keywords": [
+    "vrchat",
+    "avatar",
+    "world",
+    "editor",
+    "utility",
+    "inspection",
+    "performance",
+    "missing-reference"
+  ]
+}

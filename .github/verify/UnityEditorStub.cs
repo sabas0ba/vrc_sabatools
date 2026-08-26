@@ -1,4 +1,4 @@
-// Minimal UnityEditor surface used by io.github.sabas0ba.sabatools.inspect,
+// Minimal UnityEditor surface used by io.github.sabas0ba.sabatools.core,
 // so the Editor assembly can be compiled outside Unity.
 //
 // CAVEAT: these signatures are written by hand. They verify that the package's
@@ -8,11 +8,33 @@
 // UnityEditor.dll is not redistributable, so there is nothing to check against.
 // The Unity workflow is the tier that closes that gap.
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace UnityEditor
 {
     public enum MessageType { None = 0, Info = 1, Warning = 2, Error = 3 }
+
+    /// <summary>
+    /// Unity's precomputed type index. The core package uses it to find
+    /// InspectionModule implementations in assemblies it does not reference,
+    /// so the shape of the return value matters here even though the offline
+    /// build never enumerates anything.
+    /// </summary>
+    public static class TypeCache
+    {
+        public class TypeCollection : IEnumerable<Type>
+        {
+            public IEnumerator<Type> GetEnumerator() =>
+                ((IEnumerable<Type>)new Type[0]).GetEnumerator();
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        public static TypeCollection GetTypesDerivedFrom<T>() => new TypeCollection();
+        public static TypeCollection GetTypesDerivedFrom(Type parentType) => new TypeCollection();
+    }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class MenuItemAttribute : Attribute

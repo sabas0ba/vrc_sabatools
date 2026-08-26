@@ -1,5 +1,5 @@
 {
-    "name": "SabaTools.Inspect.Editor",
+    "name": "SabaTools.Inspect.Core.Editor",
     "rootNamespace": "SabaTools.Inspect",
     "references": [],
     "includePlatforms": [

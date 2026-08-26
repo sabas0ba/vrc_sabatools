@@ -2,7 +2,7 @@ name: Build Release
 
 # Tag formats:
 #   v0.1.0                            -> the only package under Packages/
-#   io.github.sabas0ba.sabatools.inspect/v0.1.0      -> that specific package
+#   io.github.sabas0ba.sabatools.core/v0.1.0      -> that specific package
 on:
   push:
     tags:
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: "Package id (e.g. io.github.sabas0ba.sabatools.inspect). Leave empty to auto-detect."
+        description: "Package id (e.g. io.github.sabas0ba.sabatools.core). Leave empty to auto-detect."
         required: false
         default: ""
 

@@ -1,0 +1,28 @@
+{
+    "name": "SabaTools.Inspect.World.Editor",
+    "rootNamespace": "SabaTools.Inspect.World",
+    "references": [
+        "SabaTools.Inspect.Core.Editor",
+        "VRC.SDK3",
+        "VRC.SDK3.Editor",
+        "VRCSDKBase",
+        "VRC.Udon"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.vrchat.worlds",
+            "expression": "",
+            "define": "SABATOOLS_VRC_WORLDS"
+        }
+    ],
+    "noEngineReferences": false
+}

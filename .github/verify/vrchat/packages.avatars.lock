@@ -1,0 +1,17 @@
+# Pinned VRChat SDK packages for the Avatars verification project.
+#
+# Fields: <package id> <version> <sha256 of the zip> <download url>
+#
+# Same rules as packages.worlds.lock. The two lanes are separate files because
+# com.vrchat.avatars and com.vrchat.worlds are not meant to share a project --
+# which is the whole reason sabatools.avatar and sabatools.world are separate
+# packages.
+#
+# TODO: the com.vrchat.avatars hash below is a placeholder and fetch.sh will
+# refuse it. Take the real value for the pinned version from the official
+# listing (https://packages.vrchat.com/official) and replace it. Leaving the
+# placeholder in place fails loudly, which is the intended behaviour: a
+# guessed hash would be worse than no hash.
+
+com.vrchat.base    3.10.4 86e8187a7d8f5fb5a54d442b64d09899be2fab2ef1b7822a3c202549ff05ff6b https://github.com/vrchat/packages/releases/download/3.10.4/com.vrchat.base-3.10.4.zip
+com.vrchat.avatars 3.10.4 FILL_ME_IN_SHA256_FROM_THE_OFFICIAL_LISTING                      https://github.com/vrchat/packages/releases/download/3.10.4/com.vrchat.avatars-3.10.4.zip

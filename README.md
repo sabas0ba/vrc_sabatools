@@ -4,6 +4,8 @@ VRChat 向けの**アバター／ワールド編集用ユーティリティ**を
 
 複数パッケージの集合体として育てていく前提の構成です。第一弾として、非破壊の検査ツール **SabaTools Inspect** を収録しています。
 
+パッケージは対象別に 3 つに分かれています。VRChat の Avatars SDK と Worlds SDK は同一プロジェクトでの併用が想定されていないため、SDK に依存する部分をプロジェクトの種類ごとに切り離してあります。
+
 `vrc_sabaprops` (アセット) / `vrc_sabashader` (シェーダー) と同じ配布・検証の構成を踏襲しており、こちらは「編集を助ける Editor 拡張」を担当します。
 
 ---
@@ -25,13 +27,25 @@ https://sabas0ba.github.io/vrc_sabatools/index.json
 
 ## 収録パッケージ
 
-| Package ID | 名前 | 概要 |
-| --- | --- | --- |
-| `io.github.sabas0ba.sabatools.inspect` | SabaTools Inspect | アバター・ワールドの非破壊検査。統計、Missing 参照の検出、パフォーマンス参考値のチェックリストを一覧表示し Markdown で書き出せます。 |
+| Package ID | 名前 | 依存する SDK | 概要 |
+| --- | --- | --- | --- |
+| `io.github.sabas0ba.sabatools.core` | SabaTools Inspect Core | なし | 統計、Missing 参照の検出、レポート出力。単体で完結します |
+| `io.github.sabas0ba.sabatools.avatar` | SabaTools Inspect for Avatars | `com.vrchat.avatars` | `VRCAvatarDescriptor` を型で読む検査を追加します |
+| `io.github.sabas0ba.sabatools.world` | SabaTools Inspect for Worlds | `com.vrchat.worlds` | `VRCSceneDescriptor` を型で読む検査を追加します |
+
+**どれを入れるか**: アバター用プロジェクトなら `avatar`、ワールド用なら `world` を入れてください。`core` は依存として自動的に入ります。SDK を使わないプロジェクトや、統計と Missing 参照の検出だけで足りる場合は `core` 単体で構いません。`avatar` と `world` を同時に入れる必要はなく、入れると両方の SDK がプロジェクトへ引き込まれます。
 
 各パッケージの詳細は `Packages/<package-id>/README.md` を参照してください。
 
 導入後の最短手順は `Tools > SabaTools > Inspect Window` です。対象を指定して Scan するだけで、シーンには何も書き込みません。
+
+### 3 つに分けている理由
+
+`vpmDependencies` は VCC が実際に解決してインストールします。1 つのパッケージが `com.vrchat.avatars` を宣言すれば、それを入れたワールドプロジェクトにもアバター SDK が入ります。両 SDK の同居は公式にサポートされていないため、SDK 依存を持つ部分を対象別に切り離しています。
+
+分割の軸を「ツールの種類」ではなく「対象」にしているのは、SDK がプロジェクト単位の硬い制約である一方、ツールの種類は分類にすぎないためです。この軸であれば、収録ツールが増えてもパッケージは 3 つのままです。
+
+core は両モジュールのアセンブリを参照しません。`InspectionModule` を継承した型を `UnityEditor.TypeCache` で拾うため、依存の矢印は avatar → core、world → core の一方向だけです。
 
 ---
 
@@ -40,11 +54,13 @@ https://sabas0ba.github.io/vrc_sabatools/index.json
 ```
 .
 ├── Packages/                       # 配布する VPM パッケージ群（1 フォルダ = 1 パッケージ）
-│   └── io.github.sabas0ba.sabatools.inspect/
-│       ├── package.json            # VPM マニフェスト
-│       └── Editor/
-│           ├── Core/               # Unity 非依存のロジック（判定・推定・レポート）
-│           └── *.cs                # Unity に依存する収集器とウィンドウ
+│   ├── io.github.sabas0ba.sabatools.core/
+│   │   ├── package.json            # VPM マニフェスト
+│   │   └── Editor/
+│   │       ├── Core/               # Unity 非依存のロジック（判定・推定・レポート）
+│   │       └── *.cs                # Unity に依存する収集器とウィンドウ、拡張点
+│   ├── io.github.sabas0ba.sabatools.avatar/
+│   └── io.github.sabas0ba.sabatools.world/
 ├── Website/                        # GitHub Pages で公開するリスティングサイト
 ├── source.json                     # VPM リスティングのメタ情報
 ├── flake.nix / flake.lock          # 検証に必要なツールチェーン（dotnet SDK 等）
@@ -54,7 +70,11 @@ https://sabas0ba.github.io/vrc_sabatools/index.json
     │   ├── gen_meta.py             # 不足している .meta を生成する
     │   ├── build_listing.py        # Releases → index.json 生成
     │   └── build_docs.py           # パッケージの Markdown → ドキュメントサイト
-    ├── verify/                     # Unity 無しの検証一式（下記）
+    ├── verify/
+    │   ├── verify.sh               # Unity 無しの検証一式（下記）
+    │   ├── offline/                # 素の .NET で実行するルールのテスト
+    │   ├── CIProject/              # SDK 無しの Unity プロジェクト
+    │   └── vrchat/                 # SDK を hash 固定で取得する 2 レーンの検証
     └── workflows/
         ├── verify.yml              # PR ごとのオフライン検証
         ├── unity.yml               # 実 Unity での EditMode テスト（licence 必須）
@@ -78,17 +98,25 @@ Unity が要る側 (階層の走査、`SerializedObject`、`CollectDependencies`
 nix develop        # direnv 導入済みなら direnv allow
 ```
 
-検証は次の 2 段構えです。
+検証は 3 段構えです。
 
 ```bash
-# 1. Unity 不要。Editor アセンブリのコンパイル、ルールの実行、
-#    ドキュメント生成、マニフェスト検査まで。
+# 1. Unity 不要。core の Editor アセンブリのコンパイル、全パッケージの
+#    Editor/Core の実行、ドキュメント生成、マニフェスト検査まで。
 #    podman または docker が必要 (Python を固定コンテナで動かすため)。
 ./.github/verify/verify.sh
 
-# 2. 実 Unity。GitHub Actions 側で UNITY_LICENSE が設定されている場合のみ動きます。
+# 2. 実 Unity (SDK 無し)。core の収集器とウィンドウを実際の UnityEditor API で
+#    動かします。GitHub Actions では UNITY_LICENSE がある場合のみ動きます。
 #    ローカルでは CIProject をそのまま Unity で開いて Test Runner を実行します。
+
+# 3. 実 Unity + 実 VRChat SDK。avatar / world モジュールを対象別のプロジェクトで
+#    検証します。SDK は SHA256 で固定して取得します。
+./.github/verify/vrchat/run-tests.sh worlds
+./.github/verify/vrchat/run-tests.sh avatars
 ```
+
+1 で `avatar` / `world` パッケージの SDK 依存部分は検証できません。SDK のアセンブリは再配布できず NuGet にも無いためで、その分を 3 が担います。詳細は [.github/verify/vrchat/README.md](.github/verify/vrchat/README.md) にあります。
 
 新しいファイルを追加したら `.meta` を生成してからコミットします。GUID を固定しておかないと導入のたびに参照が壊れます。
 
@@ -98,9 +126,15 @@ nix develop        # direnv 導入済みなら direnv allow
 
 ### リリース
 
+パッケージごとに独立してリリースします。core だけの修正で avatar のバージョンを上げる必要はありません。
+
 1. `Packages/<package-id>/package.json` の `version` を上げ、`CHANGELOG.md` に同じバージョンの節を追加する
-2. `<package-id>/v<version>` の形式でタグを打つ (パッケージが 1 つだけなら `v<version>` でも可)
+2. `<package-id>/v<version>` の形式でタグを打つ
 3. `build-release.yml` が zip と manifest を Release に添付し、`build-listing.yml` が `index.json` を再生成して Pages へ配置する
+
+パッケージが複数あるため、`v<version>` だけのタグは `build-release.yml` が明示的に失敗させます。どのパッケージを指すか決められないためです。
+
+core に破壊的変更を入れる場合は、`avatar` / `world` の `vpmDependencies` の下限も同時に上げてください。
 
 ---
 

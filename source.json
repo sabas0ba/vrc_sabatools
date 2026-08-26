@@ -11,6 +11,8 @@
   "bannerUrl": "",
   "githubRepo": "sabas0ba/vrc_sabatools",
   "packages": [
-    "io.github.sabas0ba.sabatools.inspect"
+    "io.github.sabas0ba.sabatools.core",
+    "io.github.sabas0ba.sabatools.avatar",
+    "io.github.sabas0ba.sabatools.world"
   ]
 }
