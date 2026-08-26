@@ -1,6 +1,13 @@
 // Collects the textures a hierarchy depends on and estimates their GPU
 // memory. Goes through EditorUtility.CollectDependencies so it sees what a
 // build would pull in through materials, not only what is directly assigned.
+//
+// LIMITATION: CollectDependencies follows persistent references and nothing
+// else. Handed a hierarchy whose material was built in memory and never saved,
+// it returns the GameObject and its components and stops, so those textures go
+// uncounted. Assets on disk -- what an avatar or a world is made of -- are
+// followed as expected. Measured on Unity 2022.3.22f1; the EditMode test
+// FindsTexturesThroughMaterials creates real assets for this reason.
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;

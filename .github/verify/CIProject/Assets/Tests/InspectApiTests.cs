@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using SabaTools.Inspect;
 using SabaTools.Inspect.Editors;
+using UnityEditor;
 using UnityEngine;
 
 namespace SabaTools.Inspect.CITests
@@ -99,16 +100,36 @@ namespace SabaTools.Inspect.CITests
             // The point of going through CollectDependencies rather than
             // reading assigned fields: the texture is reachable only via the
             // material's shader property.
-            GameObject root = NewRoot("Root");
-            root.AddComponent<MeshFilter>().sharedMesh = BuildTriangle();
-
-            var texture = new Texture2D(64, 64, TextureFormat.RGBA32, false);
-            var material = new Material(Shader.Find("Unlit/Texture"));
-            material.mainTexture = texture;
-            root.AddComponent<MeshRenderer>().sharedMaterial = material;
+            //
+            // The material and the texture have to be assets on disk.
+            // CollectDependencies follows persistent references only: handed a
+            // hierarchy whose material was built in memory it returns the
+            // GameObject and its components and stops. That is also the
+            // collector's real limitation -- a scene that assembles its
+            // materials at runtime reports no textures.
+            const string folder = "Assets/InspectApiTestAssets";
+            AssetDatabase.DeleteAsset(folder);
+            AssetDatabase.CreateFolder("Assets", "InspectApiTestAssets");
 
             try
             {
+                // Saved as a native asset rather than encoded to PNG: this
+                // project does not include the image conversion module.
+                var texture = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+                AssetDatabase.CreateAsset(texture, folder + "/Texture.asset");
+
+                var material = new Material(Shader.Find("Unlit/Texture"))
+                {
+                    mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(folder + "/Texture.asset"),
+                };
+                AssetDatabase.CreateAsset(material, folder + "/Material.mat");
+                AssetDatabase.SaveAssets();
+
+                GameObject root = NewRoot("Root");
+                root.AddComponent<MeshFilter>().sharedMesh = BuildTriangle();
+                root.AddComponent<MeshRenderer>().sharedMaterial =
+                    AssetDatabase.LoadAssetAtPath<Material>(folder + "/Material.mat");
+
                 InspectionReport report = InspectApi.Inspect(root, InspectMode.Generic);
 
                 Assert.Greater(report.Snapshot.TextureCount, 0, "the material's texture is found");
@@ -116,8 +137,7 @@ namespace SabaTools.Inspect.CITests
             }
             finally
             {
-                Object.DestroyImmediate(material);
-                Object.DestroyImmediate(texture);
+                AssetDatabase.DeleteAsset(folder);
             }
         }
 
@@ -168,9 +188,12 @@ namespace SabaTools.Inspect.CITests
         }
 
         /// <summary>
-        /// JsonUtility rather than an editor serializer: this has to run the
-        /// same way whichever assembly it is compiled into, and the serialized
-        /// fields are exactly what a stray write would change.
+        /// EditorJsonUtility, not JsonUtility: the latter refuses engine types
+        /// ("JsonUtility.ToJson does not support engine types"), and a
+        /// hierarchy of Transforms and renderers is nothing but engine types.
+        /// This assembly is Editor-only, so the editor serializer is available
+        /// wherever these tests run. The serialized fields are exactly what a
+        /// stray write would change.
         /// </summary>
         private static List<string> SerializeHierarchy(GameObject root)
         {
@@ -182,7 +205,7 @@ namespace SabaTools.Inspect.CITests
                 {
                     lines.Add(component == null
                         ? "<missing>"
-                        : component.GetType().FullName + "|" + JsonUtility.ToJson(component));
+                        : component.GetType().FullName + "|" + EditorJsonUtility.ToJson(component));
                 }
             }
             return lines;

@@ -131,6 +131,30 @@ namespace UnityEditor
         public static bool DisplayDialog(string title, string message, string ok) => false;
     }
 
+    /// <summary>
+    /// Used only by the EditMode tests, which need the material and texture in
+    /// FindsTexturesThroughMaterials to be assets: CollectDependencies follows
+    /// persistent references and nothing else.
+    /// </summary>
+    public static class AssetDatabase
+    {
+        public static string CreateFolder(string parentFolder, string newFolderName) => string.Empty;
+        public static bool DeleteAsset(string path) => false;
+        public static void CreateAsset(UnityEngine.Object asset, string path) { }
+        public static void SaveAssets() { }
+        public static T LoadAssetAtPath<T>(string assetPath) where T : UnityEngine.Object => null;
+    }
+
+    /// <summary>
+    /// The editor serializer. Unlike UnityEngine.JsonUtility it accepts engine
+    /// types, which is what the untouched-hierarchy test compares.
+    /// </summary>
+    public static class EditorJsonUtility
+    {
+        public static string ToJson(object obj) => string.Empty;
+        public static string ToJson(object obj, bool prettyPrint) => string.Empty;
+    }
+
     public static class Selection
     {
         public static GameObject activeGameObject { get; set; }
