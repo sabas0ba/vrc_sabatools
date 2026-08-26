@@ -75,6 +75,25 @@ avatar / world の `vpmDependencies` は SDK の**下限**のみを宣言する 
 は値名 (`ToString()`) で比較しており、SDK 更新で値が増えてもコンパイルエラーにならない。
 新しいフィールドを読み始める場合は、対応するレーンのテストを同時に足すこと。
 
+### SDK のアセンブリ (3.10.4 で実測)
+
+SDK の主要な型は asmdef ではなく **precompiled plugin** に入っている。asmdef として
+存在するのは `VRC.SDKBase` / `VRC.SDKBase.Editor` / `VRC.SDK3` / `VRC.SDK3.Editor` /
+`VRC.SDK3A` / `VRC.SDK3A.Editor` / `VRC.Udon` などである。
+
+| 型 | 所在 | 種別 |
+| --- | --- | --- |
+| `VRC.SDK3.Components.VRCSceneDescriptor` | `VRCSDK3.dll` | plugin |
+| `VRC.SDK3.Avatars.Components.VRCAvatarDescriptor` | `VRCSDK3A.dll` | plugin |
+| `VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone` | `VRC.SDK3.Dynamics.PhysBone.dll` | plugin |
+| `ViewPosition` / `spawns` / `RespawnHeightY` (基底型) | `VRCSDKBase.dll` | plugin |
+
+plugin は `overrideReferences: false` の asmdef へ自動参照される。モジュール本体が
+これに当たるため、`references` に書かなくてもコンパイルは通る。一方 **テスト用の
+asmdef は `overrideReferences: true`** であり、自動参照が無効になるので
+`precompiledReferences` に DLL 名を明示しないと参照できない。SDK の型を新たに使う
+テストを足す場合はここを確認すること。
+
 ## パフォーマンス参考値
 
 `ChecklistRules.AvatarMetrics` のしきい値は VRChat 公式ドキュメントを手で写した参考値

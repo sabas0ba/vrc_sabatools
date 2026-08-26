@@ -40,72 +40,65 @@ git である。Python はホストに入れず、`.github/scripts/run.sh` が d
 `python:3.12-slim` コンテナで実行する。したがって **podman または docker がホストに
 必要**である。
 
-## 未実施の検証 (最初にやること)
+## 検証の実施状況
 
 作成環境 (Anthropic のクラウドサンドボックス) には .NET SDK が無く、NuGet・コンテナ
-レジストリ・GitHub Releases への通信も遮断されていた。このため **C# のコンパイルと
-実行は一度も行えていない**。手元で最初に通すこと。
+レジストリ・GitHub Releases への通信も遮断されていたため、C# のコンパイルと実行は
+一度も行えていなかった。2026-08-27 に手元 (Windows 11 + WSL) で全階層を実行し、
+すべて通過させた。
+
+| 階層 | 検証 | 結果 |
+| --- | --- | --- |
+| 1 | `verify.sh` (Unity 不要の全工程) | 通過 |
+| 2 | 実 Unity の EditMode テスト (`CIProject`, SDK 無し) | 9/9 通過 |
+| 3 | 実 VRChat SDK の EditMode テスト (worlds) | 9/9 通過 |
+| 3 | 実 VRChat SDK の EditMode テスト (avatars) | 9/9 通過 |
+
+Unity は 2022.3.22f1、VRChat SDK は 3.10.4 である。
+
+初回の実行では 3 件の失敗が出た。いずれも実物に当たらなければ分からない類であり、
+修正は `fix:` コミットに分けて記録してある。
+
+- テスト用 asmdef が `overrideReferences: true` のため、precompiled plugin
+  (`VRCSDK3.dll` / `VRCSDK3A.dll` / `VRCSDKBase.dll`) が参照できていなかった
+- `JsonUtility.ToJson` は engine 型を扱えないため、`ScanningLeavesTheHierarchyUntouched`
+  が実行不能だった。非破壊性は SDK 無しの階層では未検証の状態だった
+- `EditorUtility.CollectDependencies` は persistent な参照しか辿らないため、
+  メモリ上に作ったマテリアル経由ではテクスチャが見つからなかった
+
+### 手元で回す
 
 ```bash
 ./.github/verify/verify.sh                       # Unity 不要の全検証
 ./.github/verify/vrchat/run-tests.sh worlds      # 実 SDK (worlds)
-./.github/verify/vrchat/run-tests.sh avatars     # 実 SDK (avatars) ※下記の準備が必要
+./.github/verify/vrchat/run-tests.sh avatars     # 実 SDK (avatars)
 ```
 
-サンドボックスで実行済みなのは以下に限られる。
+`run-tests.sh` は対象プロジェクトが既にあると `assemble.sh` を呼ばない。パッケージや
+テストを変更した後は `assemble.sh <lane>` を明示的に先に実行すること。
 
-| 検証 | 結果 |
-| --- | --- |
-| `check_package.py` (3 パッケージのマニフェスト・CHANGELOG・`.meta`・兄弟依存) | 通過 |
-| `build_docs.py` + `check_docs.py` (7 ページ生成とリンク検査) | 通過 |
-| `bash -n` / `sh -n` (verify.sh, run.sh, vrchat/*.sh) | 通過 |
-| JSON の妥当性 (source.json, 各 package.json, asmdef, flake.lock) | 通過 |
-| 全 `Editor/Core` に Unity / VRC の using が無いこと | 通過 |
-| C# 24 ファイルの括弧対応と `StatsSnapshot` 参照の解決 | 通過 (静的照合のみ) |
-| `UnityEditorStub.cs` がオフラインで使う UnityEditor メンバを網羅すること | 通過 (静的照合のみ) |
-| GitHub Actions が SHA 固定、コンテナが digest 固定であること | 通過 |
-| **C# のコンパイル (`verify.sh`)** | **未実行** |
-| **オフラインのルール実行 (`InspectRulesTests`)** | **未実行** |
-| **実 Unity の EditMode テスト** | **未実行** |
-| **実 VRChat SDK の EditMode テスト** | **未実行** |
-
-静的照合は正規表現による近似であり、コンパイラの代わりにはならない。落ちた場合に
-疑うべきはこの順である。
-
-1. **asmdef の SDK アセンブリ名**。`VRC.SDK3A` / `VRC.SDK3` / `VRCSDKBase` /
-   `VRC.SDK3.Dynamics.PhysBone` / `VRC.Udon` を参照しているが、公式ドキュメントで
-   確認できたのは Editor 側の `VRC.SDK3A.Editor` / `VRC.SDK3.Editor` /
-   `VRC.SDKBase.Editor` のみで、ランタイム側の名前は SDK 実物で未確認である。
-   Unity が "Assembly reference not found" を出したら、SDK の asmdef を見て直すこと
-2. モジュールが読む SDK のフィールド名 (`ViewPosition`、`expressionParameters`、
-   `spawns`、`RespawnHeightY` など)
-3. `UnityEditorStub.cs` のシグネチャ (引数の型や順序は手書きであり未検証)
-4. `offline/InspectRulesTests.cs` のオーバーロード解決
+階層 2 は `run-tests.sh` の対象外である。`.github/verify/CIProject` を Unity で開いて
+Test Runner を回すか、`unity.yml` の `editmode` job と同じ手順でプロジェクトを組んで
+バッチモードで実行する。
 
 ## 残作業
 
-### 1. avatars レーンの SHA256 を埋める
+### 1. avatars レーンの SHA256 を埋める — 完了 (2026-08-27)
 
-`.github/verify/vrchat/packages.avatars.lock` の `com.vrchat.avatars` のハッシュは
-`FILL_ME_IN_SHA256_FROM_THE_OFFICIAL_LISTING` のままである。サンドボックスから
-GitHub Releases へ到達できず、算出できなかった。公式リスティング
-<https://packages.vrchat.com/official> の値に差し替えること。未記入のままだと
-`fetch.sh` が明示的に失敗する (推測して埋めるより失敗させる方針)。
+公式リスティング <https://packages.vrchat.com/official> の公表値へ差し替えた。同じ
+リスティングから引いた `com.vrchat.base` と `com.vrchat.worlds` のハッシュが既存値と
+一致すること、および zip 実物の実測値が公表値と一致することの二点で確認してある。
 
-`com.vrchat.base` と `com.vrchat.worlds` のハッシュは `vrc_sabaprops` の
-`packages.lock` から引き継いだ検証済みの値である。
+### 2. GitHub リポジトリの作成と push — 完了 (2026-08-27)
 
-### 2. GitHub リポジトリの作成と push
+<https://github.com/sabas0ba/vrc_sabatools> を public で作成し、`main` を push した。
 
-```bash
-gh repo create sabas0ba/vrc_sabatools --public \
-  --description "Avatar and world editing utilities for VRChat"
-git remote add origin git@github.com:sabas0ba/vrc_sabatools.git
-git push -u origin main
-```
+トピックは未設定である。`vrchat` / `vpm` / `unity-editor` / `vrchat-avatars` /
+`vrchat-worlds` あたりが既存 2 リポジトリと揃う。
 
-トピックは `vrchat` / `vpm` / `unity-editor` / `vrchat-avatars` / `vrchat-worlds` あたりが
-既存 2 リポジトリと揃う。
+なお push 後も Actions の実行が 0 件のままである。4 つの workflow はいずれも `active`
+として登録され、`actions/permissions` も `enabled: true` を返すので、原因は未特定で
+ある。`workflow_dispatch` で手動起動して切り分けること。
 
 ### 3. GitHub Pages の有効化
 
@@ -152,9 +145,10 @@ git push origin io.github.sabas0ba.sabatools.core/v0.1.0
 
 ## 既知の未確定事項
 
-- asmdef の SDK ランタイムアセンブリ名 (上記 1)
 - `TextureMemoryEstimate` の推定値と Unity の実測 (`Profiler.GetRuntimeMemorySizeLong`)
   の突き合わせは未実施
+- `TextureUsageCollector` は `EditorUtility.CollectDependencies` に依存するため、
+  実行時に組み立てられたマテリアルのテクスチャは数えない (2022.3.22f1 で実測)
 - PhysBone の影響 Transform 数は近似であり、SDK 自身の数え方とは一致しない
 - `.github/scripts/run.sh` と `vrchat/fetch.sh` のイメージ digest は `vrc_sabaprops`
   から引き継いだもの。更新する場合は 3 リポジトリで揃えるか、揃えない理由を残すこと
