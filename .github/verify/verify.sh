@@ -28,9 +28,9 @@
 #     ones. They are reference values copied by hand; nothing here fetches the
 #     document to compare.
 #
-# Requirements: dotnet SDK 8+, curl, unzip, and podman or docker. Python is not
-# required on the host: every script that needs it runs in the pinned container
-# that .github/scripts/run.sh starts.
+# Requirements: dotnet SDK 8+, curl and unzip. The content checks additionally
+# require podman or docker. Python is not required on the host: every script
+# that needs it runs in the pinned container that .github/scripts/run.sh starts.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -108,12 +108,9 @@ UNITY_ARGS=()
 for dll in "$UNITY_DIR"/*.dll; do UNITY_ARGS+=(-r:"$dll"); done
 
 # CS1701/1702: assembly version unification between net35 and net472 refs.
-COMMON=(-nostdlib+ -noconfig -langversion:9.0 -nowarn:1701,1702 -target:library -nologo)
+COMMON=(-nostdlib+ -noconfig -langversion:9.0 "-nowarn:1701,1702" -target:library -nologo)
 
 csc() { dotnet "$CSC_DLL" "$@"; }
-
-# All Python in this repository runs in a pinned container; see run.sh.
-PYTHON="$REPO/.github/scripts/run.sh"
 
 # ---------------------------------------------------------------------------
 log "Compiling UnityEditor stub"
@@ -163,46 +160,18 @@ log "Running the rules (no Unity)"
 # ---------------------------------------------------------------------------
 # Everything above proves the code compiles. This runs it: the real rank
 # thresholds, checklist, memory estimate, avatar and world limits and report
-# writer, executed against the .NET runtime that is present. See
-# offline/InspectRulesTests.cs.
-OFFLINE="$HERE/offline"
-OFFLINE_OUT="$OUT/offline"
-mkdir -p "$OFFLINE_OUT"
-
-# Targets the .NET runtime that is present, not net35 like the steps above:
-# this assembly has to execute.
-# `dotnet --list-runtimes` prints "<name> <version> [<path>]"; the last
-# Microsoft.NETCore.App entry is the newest installed shared framework, and its
-# assemblies are what this executable both compiles against and runs on.
-RUNTIME_DIR="$(dotnet --list-runtimes \
-    | awk '/^Microsoft.NETCore.App /{ gsub(/[][]/, "", $3); dir=$3 "/" $2 } END { print dir }')"
-[ -d "$RUNTIME_DIR" ] || fail "could not locate a Microsoft.NETCore.App shared framework"
-
-RUNTIME_ARGS=()
-for name in System.Runtime System.Private.CoreLib System.Collections System.Console System.Linq; do
-    RUNTIME_ARGS+=(-r:"$RUNTIME_DIR/$name.dll")
-done
-
-mapfile -t CORE_SOURCES < <(find "$REPO/Packages" -path '*/Editor/Core/*' -name '*.cs' | sort)
-[ "${#CORE_SOURCES[@]}" -gt 0 ] || fail "no Editor/Core sources found under Packages/"
-
-csc -nologo -langversion:9.0 -target:exe -nostdlib+ -noconfig \
-    "${RUNTIME_ARGS[@]}" \
-    -out:"$OFFLINE_OUT/InspectRulesTests.dll" \
-    "$OFFLINE/InspectRulesTests.cs" \
-    "${CORE_SOURCES[@]}"
-
-cat > "$OFFLINE_OUT/InspectRulesTests.runtimeconfig.json" <<'JSON'
-{
-  "runtimeOptions": {
-    "tfm": "net8.0",
-    "framework": { "name": "Microsoft.NETCore.App", "version": "8.0.0" },
-    "rollForward": "latestMajor"
-  }
-}
-JSON
-
-dotnet "$OFFLINE_OUT/InspectRulesTests.dll" || fail "offline rule checks failed"
+# writer. The project links the shipped Editor/Core sources directly and has
+# no package dependencies, so the same command is also a standalone CI job.
+# VERIFY_SKIP_OFFLINE_TESTS is used only by verify.yml after that job has
+# already passed, avoiding a duplicate execution in the validation job.
+if [ "${VERIFY_SKIP_OFFLINE_TESTS:-0}" = "1" ]; then
+    echo "skipped: already run by the non-Unity regression job"
+else
+    dotnet run \
+        --project "$HERE/offline/SabaTools.Inspect.OfflineTests.csproj" \
+        --configuration Release \
+        || fail "offline rule checks failed"
+fi
 
 # ---------------------------------------------------------------------------
 log "Compiling CI EditMode tests"
@@ -226,28 +195,11 @@ else
     echo "skipped: no CI project"
 fi
 
-# ---------------------------------------------------------------------------
-log "Rendering documentation"
-# ---------------------------------------------------------------------------
-# The docs site is generated from the same Markdown the repository ships, by a
-# hand-written converter. Building it here means a document that trips the
-# converter fails the pull request rather than the deploy.
-# Built into a copy of the site, not into the working tree: the link check
-# resolves references to the listing page and the shared stylesheet, so those
-# have to be sitting where the deployed site would have them.
-rm -rf "$OUT/site"
-mkdir -p "$OUT/site"
-cp -r "$REPO/Website/." "$OUT/site/"
-rm -rf "$OUT/site/docs"
-
-"$PYTHON" .github/scripts/build_docs.py --repo "$REPO" --out "$OUT/site"
-"$PYTHON" .github/scripts/check_docs.py --repo "$REPO" --out "$OUT/site"
-
-# ---------------------------------------------------------------------------
-log "Validating manifests"
-# ---------------------------------------------------------------------------
-for package in "${PACKAGES[@]}"; do
-    "$PYTHON" .github/scripts/check_package.py "$REPO" "$package"
-done
+if [ "${VERIFY_SKIP_CONTAINER_CHECKS:-0}" = "1" ]; then
+    log "Skipping container-backed content checks"
+    echo "skipped: run .github/verify/verify-content.sh on the container host"
+else
+    bash "$HERE/verify-content.sh"
+fi
 
 log "All checks passed"

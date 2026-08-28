@@ -15,15 +15,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  compile:
-    name: Compile and validate
+  non-unity-regression:
+    name: Non-Unity regression tests
     runs-on: ubuntu-latest
+    env:
+      VERIFY_IMAGE: localhost/vrc-sabatools-dev:${{ github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          dotnet-version: "8.0.x"
+      - name: Build the pinned Nix development image
+        run: docker build --pull --tag "$VERIFY_IMAGE" .
+
+      # Links and executes the production Editor/Core sources directly. This
+      # job has no Unity, NuGet package or network dependency after the image
+      # build has materialised the flake.lock development profile.
+      - name: Run Editor/Core regression tests
+        run: >-
+          docker run --rm --network=none "$VERIFY_IMAGE"
+          dotnet run
+          --project .github/verify/offline/SabaTools.Inspect.OfflineTests.csproj
+          --configuration Release
+
+  compile:
+    name: Compile and validate packages
+    runs-on: ubuntu-latest
+    env:
+      VERIFY_IMAGE: localhost/vrc-sabatools-dev:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Build the pinned Nix development image
+        run: docker build --pull --tag "$VERIFY_IMAGE" .
 
       # The reference assemblies never change for a given pin, so a cache hit
       # makes every step after the fetch network-independent.
@@ -33,9 +55,22 @@ jobs:
           path: .verify/refs
           key: unity-refs-2021.3.33-netfx-1.0.3
 
-      # No setup-python step: every Python script here runs in the pinned
-      # container that .github/scripts/run.sh starts, so the runner's
-      # interpreter never takes part. Docker is preinstalled on GitHub-hosted
-      # runners.
-      - name: Verify package
-        run: ./.github/verify/verify.sh
+      - name: Prepare bind-mounted verification directories
+        run: mkdir -p .verify/refs .verify/out
+
+      - name: Compile and run .NET checks in the Nix container
+        env:
+          VERIFY_SKIP_OFFLINE_TESTS: "1"
+          VERIFY_SKIP_CONTAINER_CHECKS: "1"
+        run: >-
+          docker run --rm
+          --env VERIFY_SKIP_OFFLINE_TESTS
+          --env VERIFY_SKIP_CONTAINER_CHECKS
+          --volume "$GITHUB_WORKSPACE/.verify/refs:/workspace/.verify/refs"
+          "$VERIFY_IMAGE"
+          ./.github/verify/verify.sh
+
+      # No setup-python step: every Python script runs in the digest-pinned
+      # container started by run.sh. Docker is the only host dependency.
+      - name: Render documentation and validate manifests
+        run: bash ./.github/verify/verify-content.sh

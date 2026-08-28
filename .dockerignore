@@ -1,0 +1,12 @@
+.git
+.verify
+build
+dist
+Library
+Logs
+Temp
+UserSettings
+**/bin
+**/obj
+*.user
+*.sln

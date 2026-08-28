@@ -16,6 +16,8 @@ Claude Code が本リポジトリで作業する際の補足。
 作業は開発シェルの内部で行う。開発シェルの外にいる場合は `nix develop`
 (direnv 導入済みであれば `direnv allow`) で入る。ツールを開発シェルの外から
 導入しない。ホストのグローバル環境 (`apt install dotnet-sdk` 等) を変更しない。
+Host に Nix が無い環境ではリポジトリの `Dockerfile` を使用し、dotnet / Nix は Podman
+container 内で実行する。Windows の Host tool は Podman と Unity のみに限定する。
 
 ## 非破壊であること
 
@@ -86,6 +88,7 @@ SDK の主要な型は asmdef ではなく **precompiled plugin** に入って�
 | `VRC.SDK3.Components.VRCSceneDescriptor` | `VRCSDK3.dll` | plugin |
 | `VRC.SDK3.Avatars.Components.VRCAvatarDescriptor` | `VRCSDK3A.dll` | plugin |
 | `VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone` | `VRC.SDK3.Dynamics.PhysBone.dll` | plugin |
+| `VRCPhysBoneBase` / `VRCPhysBoneColliderBase` | `VRC.Dynamics.dll` | plugin |
 | `ViewPosition` / `spawns` / `RespawnHeightY` (基底型) | `VRCSDKBase.dll` | plugin |
 
 plugin は `overrideReferences: false` の asmdef へ自動参照される。モジュール本体が
@@ -107,9 +110,21 @@ GitHub Actions は SHA、コンテナイメージは digest、nixpkgs はリビ�
 
 ## 変更後の検証
 
-`./.github/verify/verify.sh` を通すこと。avatar / world パッケージに手を入れた場合は
+まず Unity 非依存の回帰試験を単独で通し、その後に全検証を通すこと。
+
+```bash
+dotnet run \
+  --project .github/verify/offline/SabaTools.Inspect.OfflineTests.csproj \
+  --configuration Release
+./.github/verify/verify.sh
+```
+
+avatar / world パッケージに手を入れた場合は
 `./.github/verify/vrchat/run-tests.sh <avatars|worlds>` も実行する。前者はこの 2 つの
 パッケージの `Editor/Core` しか見ていないため、通っても SDK 依存部分は未検証である。
+
+同一リポジトリの CI で Unity licence が無い場合、`unity.yml` は失敗する。Unity 回帰試験を
+skip した success を作らないためであり、この gate を検査の都合で緩めないこと。
 
 ファイルを追加した場合は `.github/scripts/run.sh .github/scripts/gen_meta.py` で
 `.meta` を生成してからコミットする。

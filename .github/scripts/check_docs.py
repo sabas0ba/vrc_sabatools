@@ -20,6 +20,7 @@ import html
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 
 # Constructs that must have been consumed by the renderer. If one of these
@@ -45,10 +46,13 @@ class Extractor(HTMLParser):
         self.links: list[str] = []
         self.stylesheets: list[str] = []
         self.images: list[tuple[str, str]] = []
+        self.ids: list[str] = []
         self._depth_code = 0
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
+        if attributes.get("id"):
+            self.ids.append(attributes["id"])
 
         if tag in ("code", "pre"):
             self._depth_code += 1
@@ -124,8 +128,58 @@ def main() -> int:
                 if not alt.strip():
                     problems.append(f"{relative}: image without alt text: {src!r}")
 
+                if src.lower().endswith(".svg"):
+                    svg_path = os.path.normpath(os.path.join(os.path.dirname(path), src))
+                    try:
+                        svg_root = ET.parse(svg_path).getroot()
+                        if not svg_root.tag.endswith("svg"):
+                            problems.append(f"{relative}: image is not an SVG document: {src!r}")
+                    except (OSError, ET.ParseError) as error:
+                        problems.append(f"{relative}: invalid SVG {src!r}: {error}")
+
     if not pages:
         problems.append("no pages were generated")
+
+    # The VCC listing is hand-written rather than generated, but it shares the
+    # same palette and navigation targets. Check its stable interaction points
+    # and keep the old SabaProps green palette from being copied back here.
+    listing_path = os.path.join(out, "index.html")
+    if not os.path.isfile(listing_path):
+        problems.append("listing index.html is missing")
+    else:
+        with open(listing_path, encoding="utf-8") as handle:
+            listing_page = handle.read()
+
+        listing = Extractor()
+        listing.feed(listing_page)
+        for required_id in ("add-button", "listing-url", "copy-button", "packages"):
+            count = listing.ids.count(required_id)
+            if count != 1:
+                problems.append(
+                    f"listing index.html needs exactly one id={required_id!r}; found {count}"
+                )
+
+        for href in listing.stylesheets:
+            problem = check_link(href, listing_path, out)
+            if problem:
+                problems.append(f"listing index.html: {problem}")
+
+    tokens_path = os.path.join(out, "assets", "tokens.css")
+    if not os.path.isfile(tokens_path):
+        problems.append("listing color tokens are missing")
+    else:
+        with open(tokens_path, encoding="utf-8") as handle:
+            tokens = handle.read().lower()
+
+        for token in ("--bg", "--surface", "--text", "--accent", "--signal", "--avatar"):
+            if token + ":" not in tokens:
+                problems.append(f"listing color tokens are missing {token}")
+
+        for legacy_green in ("#3f7d33", "#7cbf65"):
+            if legacy_green in tokens:
+                problems.append(
+                    f"listing still uses the SabaProps accent {legacy_green}; use its own palette"
+                )
 
     # Every package must be reachable from the docs index.
     index = os.path.join(docs, "index.html")
@@ -157,7 +211,7 @@ def main() -> int:
             print(f"error: {problem}", file=sys.stderr)
         return 1
 
-    print(f"ok: {pages} documentation page(s) render cleanly")
+    print(f"ok: listing and {pages} documentation page(s) render cleanly")
     return 0
 
 

@@ -6,9 +6,11 @@ name: Unity
 # asserts by hand, and the collectors that need a live editor
 # (EditorUtility.CollectDependencies, the SerializedObject walk, prefab status).
 #
-# Requires a Unity licence in repository secrets. Without one every step after
-# the gate is skipped and the job reports success, so forks and contributors
-# without access are not blocked.
+# Requires a Unity licence in repository secrets. A missing licence fails
+# same-repository pull requests, main pushes and manual runs instead of
+# reporting a false success. Pull requests from forks are the one exception:
+# GitHub does not expose repository secrets to them, so the Unity jobs report a
+# notice and the non-Unity regression workflow remains the available gate.
 #
 #   UNITY_EMAIL     Unity ID email
 #   UNITY_PASSWORD  Unity ID password
@@ -33,7 +35,7 @@ concurrency:
 
 jobs:
   editmode:
-    name: Compile and EditMode tests
+    name: Core Unity EditMode regression tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -44,13 +46,17 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          FORK_PULL_REQUEST: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
           set -euo pipefail
           if [ -n "${UNITY_LICENSE:-}" ] || [ -n "${UNITY_SERIAL:-}" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "$FORK_PULL_REQUEST" = "true" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Unity job skipped::UNITY_LICENSE / UNITY_SERIAL is not set, so the real Unity compile was skipped. See .github/workflows/unity.yml."
+            echo "::notice title=Unity regression unavailable::Repository secrets are not exposed to pull requests from forks. Non-Unity regression tests still run in Verify."
+          else
+            echo "::error title=Unity licence required::Set UNITY_LICENSE or UNITY_SERIAL so the Unity regression tests cannot be silently skipped."
+            exit 1
           fi
 
       # The GameCI editor image is large; the default runner does not have room
@@ -111,7 +117,7 @@ jobs:
   # sabatools.avatar and sabatools.world are separate packages. The SDK is
   # fetched by URL and SHA256 from .github/verify/vrchat/packages.<lane>.lock.
   sdk:
-    name: SDK EditMode tests (${{ matrix.lane }})
+    name: VRChat SDK regression tests (${{ matrix.lane }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -126,13 +132,17 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          FORK_PULL_REQUEST: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
           set -euo pipefail
           if [ -n "${UNITY_LICENSE:-}" ] || [ -n "${UNITY_SERIAL:-}" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "$FORK_PULL_REQUEST" = "true" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=SDK job skipped::UNITY_LICENSE / UNITY_SERIAL is not set, so the ${{ matrix.lane }} SDK tests were skipped."
+            echo "::notice title=SDK regression unavailable::Repository secrets are not exposed to pull requests from forks. Non-Unity regression tests still run in Verify."
+          else
+            echo "::error title=Unity licence required::Set UNITY_LICENSE or UNITY_SERIAL so the ${{ matrix.lane }} SDK regression tests cannot be silently skipped."
+            exit 1
           fi
 
       - name: Free disk space

@@ -22,24 +22,30 @@ internal static class InspectRulesTests
     private static int Main()
     {
         RankThresholdsAreInclusiveUpperBounds();
+        AvatarMetricDefinitionsMatchPublishedSnapshot();
         OverallRankIsTheWorstMetric();
         CleanGenericSnapshotProducesNoFindings();
         BrokenReferencesAreReportedInEveryMode();
         AvatarModeReportsAMissingDescriptor();
         AvatarModeOnlyReportsPoorOrWorse();
+        PoorAndVeryPoorUseDifferentSeverities();
         WorldModeReportsRealtimeLightsAndCameras();
         UnknownTextureFormatIsDisclosed();
         TextureMemoryMatchesTheFormatTable();
+        TextureFormatFamiliesRemainCovered();
         UnknownFormatFallsBackToThirtyTwoBits();
         DegenerateTextureSizesEstimateZero();
         ByteFormattingUsesBinaryUnits();
         MarkdownCarriesStatsAndFindings();
         MarkdownEscapesTableSeparators();
+        EmptyMarkdownOmitsFindingsSection();
         SeverityCountsMatchTheItems();
         AModuleTakesOverTheDescriptorDiagnosis();
         ExpressionParameterBitsAreCostedPerType();
         NearlyFullIsAboutRoomForOneMoreParameter();
+        AvatarLimitConstantsRemainStable();
         RespawnHeightIsComparedAgainstGeometry();
+        WorldLimitConstantsRemainStable();
 
         if (_failures > 0)
         {
@@ -81,6 +87,34 @@ internal static class InspectRulesTests
             }
         }
         throw new InvalidOperationException("no Triangles metric");
+    }
+
+    private static void AvatarMetricDefinitionsMatchPublishedSnapshot()
+    {
+        var stats = new StatsSnapshot
+        {
+            Triangles = 1,
+            TextureMemoryBytes = 2,
+            SkinnedMeshRendererCount = 3,
+            MeshRendererCount = 4,
+            MaterialSlotCount = 5,
+            BoneCount = 6,
+            PhysBoneCount = 7,
+            PhysBoneColliderCount = 8,
+        };
+
+        List<RankedMetric> metrics = ChecklistRules.AvatarMetrics(stats);
+        AreEqual(8, metrics.Count, "number of ranked avatar metrics");
+        AssertMetric(metrics[0], "Triangles", 1, 32000, 70000, 140000, 260000);
+        AssertMetric(metrics[1], "Texture Memory (bytes)", 2,
+            40L * 1024 * 1024, 75L * 1024 * 1024,
+            110L * 1024 * 1024, 150L * 1024 * 1024);
+        AssertMetric(metrics[2], "Skinned Mesh Renderers", 3, 1, 2, 8, 16);
+        AssertMetric(metrics[3], "Mesh Renderers", 4, 4, 8, 16, 24);
+        AssertMetric(metrics[4], "Material Slots", 5, 4, 8, 16, 32);
+        AssertMetric(metrics[5], "Bones", 6, 75, 150, 256, 400);
+        AssertMetric(metrics[6], "PhysBone Components", 7, 4, 8, 16, 32);
+        AssertMetric(metrics[7], "PhysBone Colliders", 8, 4, 8, 16, 32);
     }
 
     private static void OverallRankIsTheWorstMetric()
@@ -160,6 +194,27 @@ internal static class InspectRulesTests
             "Poor metrics should be reported");
     }
 
+    private static void PoorAndVeryPoorUseDifferentSeverities()
+    {
+        var poor = new StatsSnapshot
+        {
+            HasAvatarDescriptor = true,
+            Triangles = 140001,
+        };
+        List<InspectionItem> poorItems = ChecklistRules.Evaluate(poor, InspectMode.Avatar);
+        AreEqual(1, CountOf(poorItems, InspectionSeverity.Info), "Poor is advisory");
+        AreEqual(0, CountOf(poorItems, InspectionSeverity.Warning), "Poor is not a warning");
+
+        var veryPoor = new StatsSnapshot
+        {
+            HasAvatarDescriptor = true,
+            Triangles = 260001,
+        };
+        List<InspectionItem> veryPoorItems = ChecklistRules.Evaluate(veryPoor, InspectMode.Avatar);
+        AreEqual(0, CountOf(veryPoorItems, InspectionSeverity.Info), "VeryPoor is not advisory");
+        AreEqual(1, CountOf(veryPoorItems, InspectionSeverity.Warning), "VeryPoor is a warning");
+    }
+
     private static void WorldModeReportsRealtimeLightsAndCameras()
     {
         var stats = new StatsSnapshot
@@ -205,6 +260,28 @@ internal static class InspectRulesTests
             "a cubemap is six faces");
     }
 
+    private static void TextureFormatFamiliesRemainCovered()
+    {
+        var expected = new Dictionary<string, double>
+        {
+            { "RGBA32", 32 },
+            { "DXT1", 4 },
+            { "BC7", 8 },
+            { "ETC2_RGBA8", 8 },
+            { "ASTC_4x4", 8 },
+            { "ASTC_8x8", 2 },
+            { "ASTC_HDR_12x12", 128.0 / 144.0 },
+            { "RGBAFloat", 128 },
+        };
+
+        foreach (KeyValuePair<string, double> pair in expected)
+        {
+            IsTrue(TextureMemoryEstimate.TryGetBitsPerPixel(pair.Key, out double actual),
+                pair.Key + " remains a known format");
+            AreEqual(pair.Value, actual, pair.Key + " bits per pixel");
+        }
+    }
+
     private static void UnknownFormatFallsBackToThirtyTwoBits()
     {
         IsFalse(TextureMemoryEstimate.TryGetBitsPerPixel("SomeFutureFormat", out double bpp),
@@ -220,6 +297,8 @@ internal static class InspectRulesTests
         AreEqual(0L, TextureMemoryEstimate.EstimateBytes(0, 512, 8, false, 1), "zero width");
         AreEqual(0L, TextureMemoryEstimate.EstimateBytes(512, -1, 8, false, 1), "negative height");
         AreEqual(0L, TextureMemoryEstimate.EstimateBytes(512, 512, 8, false, 0), "zero faces");
+        AreEqual(0L, TextureMemoryEstimate.EstimateBytes(512, 512, 0, false, 1), "zero bpp");
+        AreEqual(0L, TextureMemoryEstimate.EstimateBytes(512, 512, -1, false, 1), "negative bpp");
     }
 
     private static void ByteFormattingUsesBinaryUnits()
@@ -262,6 +341,16 @@ internal static class InspectRulesTests
         // silently corrupt every cell after it.
         var report = new InspectionReport { TargetName = "left|right" };
         Contains(report.ToMarkdown(), "left\\|right", "pipes are escaped");
+    }
+
+    private static void EmptyMarkdownOmitsFindingsSection()
+    {
+        var report = new InspectionReport { TargetName = "Clean" };
+        string markdown = report.ToMarkdown();
+
+        Contains(markdown, "0 error(s), 0 warning(s)", "empty finding counts");
+        DoesNotContain(markdown, "## Findings", "empty findings section");
+        DoesNotContain(markdown, "| Generated |", "empty timestamp row");
     }
 
     private static void SeverityCountsMatchTheItems()
@@ -337,6 +426,12 @@ internal static class InspectRulesTests
         IsFalse(AvatarLimits.IsNearlyFull(257), "over budget is an error, not a warning");
     }
 
+    private static void AvatarLimitConstantsRemainStable()
+    {
+        AreEqual(256, AvatarLimits.ExpressionParameterBits, "expression parameter bit limit");
+        AreEqual(8, AvatarLimits.ControlsPerMenu, "controls per expression menu");
+    }
+
     // -----------------------------------------------------------------------
     // World limits (sabatools.world)
     // -----------------------------------------------------------------------
@@ -354,6 +449,12 @@ internal static class InspectRulesTests
             "the suggestion clears the lowest geometry");
     }
 
+    private static void WorldLimitConstantsRemainStable()
+    {
+        AreEqual(1.0, WorldLimits.RespawnClearance, "respawn clearance");
+        AreEqual(2, WorldLimits.MirrorAdvisoryCount, "mirror advisory count");
+    }
+
     // -----------------------------------------------------------------------
     // Assertions
     // -----------------------------------------------------------------------
@@ -369,6 +470,18 @@ internal static class InspectRulesTests
             }
         }
         return count;
+    }
+
+    private static void AssertMetric(
+        RankedMetric metric, string label, long value,
+        long excellent, long good, long medium, long poor)
+    {
+        AreEqual(label, metric.Label, label + " label");
+        AreEqual(value, metric.Value, label + " value");
+        AreEqual(excellent, metric.Excellent, label + " Excellent threshold");
+        AreEqual(good, metric.Good, label + " Good threshold");
+        AreEqual(medium, metric.Medium, label + " Medium threshold");
+        AreEqual(poor, metric.Poor, label + " Poor threshold");
     }
 
     private static bool Mentions(List<InspectionItem> items, string fragment)
@@ -426,6 +539,14 @@ internal static class InspectRulesTests
         if (haystack == null || !haystack.Contains(needle))
         {
             Fail(what, $"missing {needle}");
+        }
+    }
+
+    private static void DoesNotContain(string haystack, string needle, string what)
+    {
+        if (haystack != null && haystack.Contains(needle))
+        {
+            Fail(what, $"unexpected {needle}");
         }
     }
 }

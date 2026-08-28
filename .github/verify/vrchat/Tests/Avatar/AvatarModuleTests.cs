@@ -5,6 +5,7 @@
 // SDK field names the module reads still exist, that TypeCache finds the
 // module from the core assembly without a reference, and that Auto mode
 // resolves to Avatar because a real descriptor was seen.
+using System.Collections.Generic;
 using NUnit.Framework;
 using SabaTools.Inspect;
 using SabaTools.Inspect.Editors;
@@ -71,6 +72,19 @@ namespace SabaTools.Inspect.Avatar.SdkTests
         }
 
         [Test]
+        public void ReportsMultipleAvatarDescriptors()
+        {
+            var nested = new GameObject("NestedAvatar");
+            nested.transform.SetParent(_avatar.transform);
+            nested.AddComponent<VRCAvatarDescriptor>();
+
+            InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+
+            Assert.Greater(report.ErrorCount, 0);
+            Assert.IsTrue(Mentions(report, "2 VRCAvatarDescriptor"));
+        }
+
+        [Test]
         public void ReportsAViewPositionLeftAtTheOrigin()
         {
             _avatar.GetComponent<VRCAvatarDescriptor>().ViewPosition = Vector3.zero;
@@ -87,6 +101,38 @@ namespace SabaTools.Inspect.Avatar.SdkTests
             InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
             Assert.IsFalse(Mentions(report, "ViewPosition"),
                 "a viewpoint at eye height should not be reported");
+        }
+
+        [Test]
+        public void ReportsImplausibleViewPositions()
+        {
+            VRCAvatarDescriptor descriptor = _avatar.GetComponent<VRCAvatarDescriptor>();
+            descriptor.ViewPosition = new Vector3(0.2f, -0.1f, 0f);
+
+            InspectionReport belowAndOffCentre = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+            Assert.IsTrue(Mentions(belowAndOffCentre, "at or below"));
+            Assert.IsTrue(Mentions(belowAndOffCentre, "centre line"));
+
+            descriptor.ViewPosition = new Vector3(0f, 3.1f, 0f);
+            InspectionReport tooHigh = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+            Assert.IsTrue(Mentions(tooHigh, "far above human scale"));
+        }
+
+        [Test]
+        public void ReportsAMenuWithoutExpressionParameters()
+        {
+            VRCExpressionsMenu menu = ScriptableObject.CreateInstance<VRCExpressionsMenu>();
+            _avatar.GetComponent<VRCAvatarDescriptor>().expressionsMenu = menu;
+
+            try
+            {
+                InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+                Assert.IsTrue(Mentions(report, "nothing to drive"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(menu);
+            }
         }
 
         [Test]
@@ -150,6 +196,40 @@ namespace SabaTools.Inspect.Avatar.SdkTests
         }
 
         [Test]
+        public void WarnsWhenTheExpressionParameterBudgetCannotFitAnotherInt()
+        {
+            VRCExpressionParameters parameters =
+                ScriptableObject.CreateInstance<VRCExpressionParameters>();
+            var entries = new VRCExpressionParameters.Parameter[32];
+            for (int i = 0; i < 31; i++)
+            {
+                entries[i] = new VRCExpressionParameters.Parameter
+                {
+                    name = "Int" + i,
+                    valueType = VRCExpressionParameters.ValueType.Int,
+                };
+            }
+            entries[31] = new VRCExpressionParameters.Parameter
+            {
+                name = "Bool",
+                valueType = VRCExpressionParameters.ValueType.Bool,
+            };
+            parameters.parameters = entries;
+            _avatar.GetComponent<VRCAvatarDescriptor>().expressionParameters = parameters;
+
+            try
+            {
+                InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+                Assert.IsTrue(Mentions(report, "no room left"));
+                Assert.IsTrue(HasRow(report, "Avatar", "Expression Parameter Bits", "249 / 256 (97%)"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(parameters);
+            }
+        }
+
+        [Test]
         public void ReportsAMenuOverTheControlLimit()
         {
             VRCExpressionsMenu menu = ScriptableObject.CreateInstance<VRCExpressionsMenu>();
@@ -197,6 +277,83 @@ namespace SabaTools.Inspect.Avatar.SdkTests
         }
 
         [Test]
+        public void ReportsAnEmptySubmenuControl()
+        {
+            VRCExpressionsMenu menu = ScriptableObject.CreateInstance<VRCExpressionsMenu>();
+            menu.controls.Add(new VRCExpressionsMenu.Control
+            {
+                name = "Empty",
+                type = VRCExpressionsMenu.Control.ControlType.SubMenu,
+                subMenu = null,
+            });
+            _avatar.GetComponent<VRCAvatarDescriptor>().expressionsMenu = menu;
+
+            try
+            {
+                InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+                Assert.IsTrue(Mentions(report, "SubMenu with nothing assigned"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(menu);
+            }
+        }
+
+        [Test]
+        public void ReportsACustomPlayableLayerWithoutAController()
+        {
+            VRCAvatarDescriptor descriptor = _avatar.GetComponent<VRCAvatarDescriptor>();
+            descriptor.customizeAnimationLayers = true;
+            descriptor.baseAnimationLayers = new[]
+            {
+                new VRCAvatarDescriptor.CustomAnimLayer { isDefault = false },
+            };
+
+            InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+
+            Assert.IsTrue(Mentions(report, "marked custom but has no animator controller"));
+        }
+
+        [Test]
+        public void ReportsEyeLookWithoutEyeBones()
+        {
+            VRCAvatarDescriptor descriptor = _avatar.GetComponent<VRCAvatarDescriptor>();
+            descriptor.enableEyeLook = true;
+            descriptor.customEyeLookSettings = new VRCAvatarDescriptor.CustomEyeLookSettings();
+
+            InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+
+            Assert.IsTrue(Mentions(report, "neither eye bone"));
+        }
+
+        [Test]
+        public void ReportsPhysBoneAffectedTransformsAndHonoursIgnoredSubtrees()
+        {
+            var included = new GameObject("Included");
+            included.transform.SetParent(_avatar.transform);
+            var includedChild = new GameObject("IncludedChild");
+            includedChild.transform.SetParent(included.transform);
+
+            var ignored = new GameObject("Ignored");
+            ignored.transform.SetParent(_avatar.transform);
+            var ignoredChild = new GameObject("IgnoredChild");
+            ignoredChild.transform.SetParent(ignored.transform);
+
+            var physBone = _avatar.AddComponent<
+                VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone>();
+            physBone.ignoreTransforms = new List<Transform> { ignored.transform };
+            _avatar.AddComponent<
+                VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneCollider>();
+
+            InspectionReport report = InspectApi.Inspect(_avatar, InspectMode.Avatar);
+
+            Assert.AreEqual(1, report.Snapshot.PhysBoneCount);
+            Assert.AreEqual(1, report.Snapshot.PhysBoneColliderCount);
+            Assert.IsTrue(HasRow(
+                report, "Avatar", "PhysBone Affected Transforms (estimate)", "2"));
+        }
+
+        [Test]
         public void ScanningLeavesTheAvatarUntouched()
         {
             var descriptor = _avatar.GetComponent<VRCAvatarDescriptor>();
@@ -213,6 +370,19 @@ namespace SabaTools.Inspect.Avatar.SdkTests
             foreach (InspectionItem item in report.Items)
             {
                 if (item.Message.Contains(fragment))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool HasRow(
+            InspectionReport report, string group, string label, string value)
+        {
+            foreach (StatRow row in report.Rows)
+            {
+                if (row.Group == group && row.Label == label && row.Value == value)
                 {
                     return true;
                 }

@@ -62,6 +62,7 @@ core は両モジュールのアセンブリを参照しません。`InspectionM
 │   ├── io.github.sabas0ba.sabatools.avatar/
 │   └── io.github.sabas0ba.sabatools.world/
 ├── Website/                        # GitHub Pages で公開するリスティングサイト
+├── docs/design.md                  # package境界・非破壊性・検証階層の設計文書
 ├── source.json                     # VPM リスティングのメタ情報
 ├── flake.nix / flake.lock          # 検証に必要なツールチェーン（dotnet SDK 等）
 └── .github/
@@ -72,7 +73,7 @@ core は両モジュールのアセンブリを参照しません。`InspectionM
     │   └── build_docs.py           # パッケージの Markdown → ドキュメントサイト
     ├── verify/
     │   ├── verify.sh               # Unity 無しの検証一式（下記）
-    │   ├── offline/                # 素の .NET で実行するルールのテスト
+    │   ├── offline/                # 素の .NET 8 で実行する独立した回帰テスト
     │   ├── CIProject/              # SDK 無しの Unity プロジェクト
     │   └── vrchat/                 # SDK を hash 固定で取得する 2 レーンの検証
     └── workflows/
@@ -92,22 +93,46 @@ Unity が要る側 (階層の走査、`SerializedObject`、`CollectDependencies`
 
 ## 開発
 
+設計上のpackage境界、非破壊性、検査のデータフロー、依存固定、既知の限界は
+[docs/design.md](docs/design.md)にまとめています。
+
 作業は nix の開発シェル内で行います。
 
 ```bash
 nix develop        # direnv 導入済みなら direnv allow
 ```
 
-検証は 3 段構えです。
+Host に Nix を導入しない場合は、dotfiles と同じ固定 Nix base image から project の
+development profile を構築します。Host で使用するのは Podman のみです。
+
+```powershell
+podman build --pull=never -t localhost/vrc-sabatools-dev:latest .
+podman run --rm --network=none `
+  -v "${PWD}:/workspace" -w /workspace `
+  localhost/vrc-sabatools-dev:latest `
+  dotnet run --project .github/verify/offline/SabaTools.Inspect.OfflineTests.csproj `
+  --configuration Release
+```
+
+image build 時は `flake.lock` で固定した Nix closure を取得します。実行時は build 済み
+profile を使うため、Unity 非依存回帰試験に network は不要です。
+
+検証は 3 段構えです。Unity 非依存の回帰テストは単独で実行でき、`verify.sh` からも同じ
+プロジェクトが呼ばれます。
 
 ```bash
-# 1. Unity 不要。core の Editor アセンブリのコンパイル、全パッケージの
-#    Editor/Core の実行、ドキュメント生成、マニフェスト検査まで。
+# 1a. Unity 不要。全パッケージの Editor/Core を直接リンクして実行する回帰テスト。
+dotnet run \
+  --project .github/verify/offline/SabaTools.Inspect.OfflineTests.csproj \
+  --configuration Release
+
+# 1b. Unity 不要。1a に加え、core の Editor アセンブリのコンパイル、
+#    ドキュメント生成、マニフェスト検査まで。
 #    podman または docker が必要 (Python を固定コンテナで動かすため)。
 ./.github/verify/verify.sh
 
-# 2. 実 Unity (SDK 無し)。core の収集器とウィンドウを実際の UnityEditor API で
-#    動かします。GitHub Actions では UNITY_LICENSE がある場合のみ動きます。
+# 2. 実 Unity (SDK 無し)。core の収集器と公開 API を実際の UnityEditor API で
+#    動かします。GitHub Actions では Unity licence を必須にします。
 #    ローカルでは CIProject をそのまま Unity で開いて Test Runner を実行します。
 
 # 3. 実 Unity + 実 VRChat SDK。avatar / world モジュールを対象別のプロジェクトで
@@ -117,6 +142,14 @@ nix develop        # direnv 導入済みなら direnv allow
 ```
 
 1 で `avatar` / `world` パッケージの SDK 依存部分は検証できません。SDK のアセンブリは再配布できず NuGet にも無いためで、その分を 3 が担います。詳細は [.github/verify/vrchat/README.md](.github/verify/vrchat/README.md) にあります。
+
+GitHub Actions の `Verify` は 1a を独立 job として表示し、1b の検証 job と並行して実行します。
+どちらの .NET 検査も `Dockerfile` から構築した固定 Nix profile 内で実行し、Host runner に
+.NET SDK または Nix を導入しません。Python 検査も digest 固定コンテナで実行します。
+`Unity` は 2 と 3 を実行します。同一リポジトリの pull request、`main` push、手動実行で
+`UNITY_LICENSE` / `UNITY_SERIAL` が無い場合は失敗し、試験を skip した状態を success として
+扱いません。GitHub が secrets を渡さない fork の pull request だけは Unity job を skip し、
+`Verify` を利用可能な回帰試験とします。
 
 新しいファイルを追加したら `.meta` を生成してからコミットします。GUID を固定しておかないと導入のたびに参照が壊れます。
 

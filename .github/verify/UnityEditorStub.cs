@@ -106,6 +106,10 @@ namespace UnityEditor
     {
         public static PrefabInstanceStatus GetPrefabInstanceStatus(UnityEngine.Object componentOrGameObject) =>
             PrefabInstanceStatus.NotAPrefab;
+
+        public static GameObject SaveAsPrefabAsset(GameObject instanceRoot, string assetPath) => instanceRoot;
+        public static UnityEngine.Object InstantiatePrefab(UnityEngine.Object assetComponentOrGameObject) =>
+            assetComponentOrGameObject;
     }
 
     public static class EditorStyles
@@ -223,10 +227,35 @@ namespace UnityEditor
     }
 }
 
+namespace UnityEditor.SceneManagement
+{
+    public enum NewSceneSetup
+    {
+        EmptyScene = 0,
+        DefaultGameObjects = 1,
+    }
+
+    public enum NewSceneMode
+    {
+        Single = 0,
+        Additive = 1,
+    }
+
+    public static class EditorSceneManager
+    {
+        public static UnityEngine.SceneManagement.Scene NewScene(
+            NewSceneSetup setup, NewSceneMode mode) => default;
+
+        public static bool CloseScene(UnityEngine.SceneManagement.Scene scene, bool removeScene) => true;
+    }
+}
+
 // Enough NUnit to compile-check the CI project's EditMode tests offline. The
 // real assertions run inside Unity via .github/workflows/unity.yml.
 namespace NUnit.Framework
 {
+    public delegate void TestDelegate();
+
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class TestAttribute : Attribute { }
 
@@ -261,5 +290,7 @@ namespace NUnit.Framework
         public static void Greater(double arg1, double arg2, string message) { }
         public static void Less(double arg1, double arg2) { }
         public static void Less(double arg1, double arg2, string message) { }
+
+        public static T Throws<T>(TestDelegate code) where T : Exception => null;
     }
 }

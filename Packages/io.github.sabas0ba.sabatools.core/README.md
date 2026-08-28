@@ -30,6 +30,11 @@ VRChat SDK に依存しないため、アバター用・ワールド用どちら
 
 Hierarchy でオブジェクトを選択して `Tools > SabaTools > Inspect Selection` でも起動できます。
 
+![SabaTools Inspectウィンドウの操作箇所](Documentation~/images/inspect-window.svg)
+
+各control、Mode、表示項目、Avatar／World別の操作例は[UI操作ガイド](Documentation~/UI.md)を
+参照してください。
+
 ## 判定の根拠と限界
 
 - テクスチャの GPU メモリはフォーマットの bpp とミップ係数 4/3 による**推定値**です。Unity の実測とは差が出ます。未知のフォーマットは 32 bpp として扱い、その旨を Findings に出します

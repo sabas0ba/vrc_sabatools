@@ -104,22 +104,5 @@ if [ ! -f "$RESULTS" ]; then
     exit 1
 fi
 
-python3 - "$RESULTS" <<'PY'
-import sys
-import xml.etree.ElementTree as ET
-
-root = ET.parse(sys.argv[1]).getroot()
-failed = 0
-
-for case in root.iter("test-case"):
-    result = case.get("result")
-    print(f"  [{result:<7}] {case.get('fullname')}")
-    if result != "Passed":
-        failed += 1
-        message = case.find("failure/message")
-        if message is not None and message.text:
-            print("      " + message.text.strip()[:1000])
-
-print(f"total={root.get('total')} passed={root.get('passed')} failed={root.get('failed')}")
-sys.exit(1 if failed else 0)
-PY
+"$REPO/.github/scripts/run.sh" \
+    .github/scripts/check_unity_results.py "$RESULTS"
