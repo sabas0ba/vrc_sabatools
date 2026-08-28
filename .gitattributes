@@ -2,6 +2,8 @@
 # core.autocrlf=true a Windows checkout would hand them to /bin/sh with CRLF
 # line endings, which fails as "bad interpreter".
 *.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
 
 # Unity resolves assets by the GUID in the .meta file. Treating these as text
 # keeps diffs reviewable; forcing LF keeps the GUIDs byte-identical whatever

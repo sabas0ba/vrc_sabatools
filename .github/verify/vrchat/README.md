@@ -29,9 +29,10 @@ Unity は Unity Hub の既定の場所から `ProjectVersion.txt` に一致す�
 
 初回は SDK が要求する UPM パッケージ (burst、collections 等) を Unity がレジストリから取得するため、数分かかります。
 
-## avatars レーンの初回設定
+## SDK の固定
 
-`packages.avatars.lock` の `com.vrchat.avatars` の SHA256 は未記入です。公式リスティング <https://packages.vrchat.com/official> の値に差し替えてください。未記入のまま実行すると `fetch.sh` が明示的に失敗します。ハッシュを推測して埋めるより、失敗させるほうが安全なためです。
+両レーンの URL と SHA256 は `packages.<lane>.lock` に記録済みです。空または形式不正の
+ハッシュは `fetch.sh` が取得前に失敗させます。
 
 ## これで検証できること
 

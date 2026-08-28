@@ -10,38 +10,136 @@
 
   body {
     margin: 0;
-    padding: 3rem 1.25rem 5rem;
+    min-height: 100vh;
+    padding: 2rem 1.25rem 4rem;
     background: var(--bg);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
     color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
     line-height: 1.7;
   }
 
-  main { max-width: 46rem; margin: 0 auto; }
+  main { max-width: 68rem; margin: 0 auto; }
 
-  h1 { font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -0.01em; }
-  h2 { font-size: 1.15rem; margin: 2.5rem 0 .75rem; }
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(2rem, 6vw, 4.25rem);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
 
-  .lede { color: var(--muted); margin: 0 0 2rem; }
+  .hero::after {
+    content: "";
+    position: absolute;
+    width: 22rem;
+    height: 22rem;
+    right: -8rem;
+    top: -10rem;
+    border: 4rem solid var(--accent-soft);
+    border-radius: 50%;
+    opacity: .8;
+    pointer-events: none;
+  }
+
+  .eyebrow {
+    margin: 0 0 .75rem;
+    color: var(--signal);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    position: relative;
+    z-index: 1;
+    max-width: 13ch;
+    margin: 0;
+    font-size: clamp(2.4rem, 7vw, 4.8rem);
+    line-height: .98;
+    letter-spacing: -.055em;
+  }
+
+  h1 span { color: var(--accent); }
+
+  h2 { font-size: 1.35rem; margin: 0; }
+
+  .lede {
+    position: relative;
+    z-index: 1;
+    max-width: 43rem;
+    margin: 1.4rem 0 0;
+    color: var(--muted);
+    font-size: 1.05rem;
+  }
+
+  .traits {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+    margin: 1.8rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .traits li {
+    padding: .3rem .7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 600;
+  }
+
+  .panel {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--surface);
+  }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: baseline;
+    margin-bottom: 1rem;
+  }
+
+  .section-head p { margin: 0; color: var(--muted); font-size: .88rem; }
 
   .add {
-    display: inline-block;
-    padding: .7rem 1.4rem;
-    border-radius: .5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: .65rem 1.3rem;
+    border-radius: .65rem;
     background: var(--accent);
     color: var(--accent-text);
     font-weight: 600;
     text-decoration: none;
+    transition: background-color .12s ease, transform .12s ease;
   }
 
-  .add:hover { filter: brightness(1.08); }
+  .add:hover { background: var(--accent-hover); transform: translateY(-1px); }
 
   .url-row {
-    display: flex;
-    gap: .5rem;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: .65rem;
     align-items: stretch;
-    margin-top: 1rem;
-    flex-wrap: wrap;
   }
 
   code, .url {
@@ -50,12 +148,11 @@
   }
 
   .url {
-    flex: 1 1 20rem;
     min-width: 0;
-    padding: .55rem .8rem;
+    padding: .62rem .85rem;
     background: var(--code-bg);
     border: 1px solid var(--border);
-    border-radius: .4rem;
+    border-radius: .65rem;
     overflow-x: auto;
     white-space: nowrap;
   }
@@ -63,7 +160,7 @@
   button.copy {
     padding: .55rem 1rem;
     border: 1px solid var(--border);
-    border-radius: .4rem;
+    border-radius: .65rem;
     background: var(--surface);
     color: var(--text);
     font: inherit;
@@ -73,23 +170,48 @@
 
   button.copy:hover { border-color: var(--accent); }
 
-  /* The whole card is the link to that package's documentation. */
-  .pkg {
-    display: block;
-    border: 1px solid var(--border);
-    border-radius: .6rem;
-    background: var(--surface);
-    padding: 1.1rem 1.25rem;
-    margin-bottom: 1rem;
-    color: inherit;
-    text-decoration: none;
-    transition: border-color .12s ease, background-color .12s ease;
+  .catalog { margin-top: 2.5rem; }
+
+  #packages {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
   }
 
-  .pkg:hover, .pkg:focus-visible { border-color: var(--accent); }
+  .pkg {
+    --card-accent: var(--accent);
+    display: block;
+    min-height: 15rem;
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--card-accent);
+    border-radius: .9rem;
+    background: var(--surface);
+    padding: 1.25rem;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color .12s ease, transform .12s ease, box-shadow .12s ease;
+  }
+
+  .pkg[data-kind="avatar"] { --card-accent: var(--avatar); }
+  .pkg[data-kind="world"] { --card-accent: var(--signal); }
+
+  .pkg:hover, .pkg:focus-visible {
+    border-color: var(--card-accent);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
+  }
   .pkg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  .pkg h3 { margin: 0 0 .15rem; font-size: 1.05rem; }
+  .pkg .kind {
+    color: var(--card-accent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  .pkg h3 { margin: .65rem 0 .2rem; font-size: 1.08rem; line-height: 1.4; }
   .pkg .id { color: var(--muted); font-size: .8rem; }
   .pkg p { margin: .6rem 0 0; color: var(--muted); font-size: .92rem; }
 
@@ -98,7 +220,7 @@
      "what happens if I click this". */
   .pkg .go {
     margin-top: .75rem;
-    color: var(--accent);
+    color: var(--card-accent);
     font-size: .85rem;
     font-weight: 600;
   }
@@ -122,22 +244,52 @@
   }
 
   a { color: var(--accent); }
+
+  @media (max-width: 760px) {
+    body { padding: 1rem .8rem 3rem; }
+    .hero, .panel { border-radius: .8rem; }
+    .url-row { grid-template-columns: 1fr auto; }
+    .add { grid-column: 1 / -1; }
+    #packages { grid-template-columns: 1fr; }
+    .pkg { min-height: 0; }
+    .section-head { display: block; }
+    .section-head p { margin-top: .25rem; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>SabaTools</h1>
-  <p class="lede">VRChat のアバター・ワールド編集用ユーティリティ集の VCC リスティングです。</p>
+  <header class="hero">
+    <p class="eyebrow">Inspect / Report / Iterate</p>
+    <h1><span>SabaTools</span> Inspect</h1>
+    <p class="lede">VRChatのアバターとワールドを変更せずに走査し、統計、設定上の問題、性能上の注意点を整理するUnity Editorツールです。</p>
+    <ul class="traits" aria-label="特徴">
+      <li>Read-only</li>
+      <li>Editor-only</li>
+      <li>Avatar + World</li>
+      <li>Markdown report</li>
+    </ul>
+  </header>
 
-  <a class="add" id="add-button" href="#">VCC に追加</a>
+  <section class="panel" aria-labelledby="install-heading">
+    <div class="section-head">
+      <h2 id="install-heading">VCCへ追加</h2>
+      <p>リポジトリURLを登録して、用途に合うパッケージを選択します。</p>
+    </div>
+    <div class="url-row">
+      <a class="add" id="add-button" href="#">VCCに追加</a>
+      <div class="url" id="listing-url">読み込み中…</div>
+      <button class="copy" id="copy-button" type="button">URLをコピー</button>
+    </div>
+  </section>
 
-  <div class="url-row">
-    <div class="url" id="listing-url">読み込み中…</div>
-    <button class="copy" id="copy-button" type="button">コピー</button>
-  </div>
-
-  <h2>収録パッケージ</h2>
-  <div id="packages">読み込み中…</div>
+  <section class="catalog" aria-labelledby="packages-heading">
+    <div class="section-head">
+      <h2 id="packages-heading">収録パッケージ</h2>
+      <p>カードから各パッケージの機能・導入条件を確認できます。</p>
+    </div>
+    <div id="packages">読み込み中…</div>
+  </section>
 
   <footer>
     <a href="docs/index.html">ドキュメント</a> ·
@@ -194,10 +346,15 @@
       // tab: someone reading the listing is usually part way through adding
       // the repository to VCC, and losing this page would interrupt that.
       var card = text('a', 'pkg');
+      var kind = id.endsWith('.avatar') ? 'avatar' :
+        (id.endsWith('.world') ? 'world' : 'core');
+      card.dataset.kind = kind;
       card.href = 'docs/' + encodeURIComponent(id) + '/index.html';
       card.target = '_blank';
       card.rel = 'noopener';
       card.setAttribute('aria-label', name + ' のドキュメントを開く (新しいタブ)');
+
+      card.appendChild(text('div', 'kind', kind + ' package'));
 
       var heading = text('h3', null, name);
       heading.appendChild(text('span', 'badge', 'v' + manifest.version));
@@ -218,7 +375,7 @@
   copyButton.addEventListener('click', function () {
     navigator.clipboard.writeText(urlNode.textContent).then(function () {
       copyButton.textContent = 'コピーしました';
-      setTimeout(function () { copyButton.textContent = 'コピー'; }, 1600);
+      setTimeout(function () { copyButton.textContent = 'URLをコピー'; }, 1600);
     });
   });
 

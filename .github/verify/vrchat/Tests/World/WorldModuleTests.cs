@@ -60,6 +60,19 @@ namespace SabaTools.Inspect.World.SdkTests
         }
 
         [Test]
+        public void ReportsMultipleSceneDescriptors()
+        {
+            var nested = new GameObject("NestedDescriptor");
+            nested.transform.SetParent(_world.transform);
+            nested.AddComponent<VRCSceneDescriptor>();
+
+            InspectionReport report = InspectApi.Inspect(_world, InspectMode.World);
+
+            Assert.Greater(report.ErrorCount, 0);
+            Assert.IsTrue(Mentions(report, "2 VRCSceneDescriptor"));
+        }
+
+        [Test]
         public void ReportsAWorldWithNoSpawnPoints()
         {
             _world.GetComponent<VRCSceneDescriptor>().spawns = new Transform[0];
@@ -118,6 +131,42 @@ namespace SabaTools.Inspect.World.SdkTests
         }
 
         [Test]
+        public void IgnoresDisabledRenderersWhenFindingTheLowestGeometry()
+        {
+            GameObject disabled = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            disabled.name = "DisabledBasement";
+            disabled.transform.SetParent(_world.transform);
+            disabled.transform.position = new Vector3(0f, -100f, 0f);
+            disabled.GetComponent<Renderer>().enabled = false;
+            _world.GetComponent<VRCSceneDescriptor>().RespawnHeightY = -50f;
+
+            InspectionReport report = InspectApi.Inspect(_world, InspectMode.World);
+
+            Assert.IsFalse(Mentions(report, "RespawnHeightY"),
+                "disabled geometry must not move the respawn boundary");
+        }
+
+        [Test]
+        public void SkipsTheRespawnGeometryCheckWhenTheWorldHasNoRenderer()
+        {
+            Object.DestroyImmediate(_floor);
+            _floor = null;
+            _world.GetComponent<VRCSceneDescriptor>().RespawnHeightY = 5f;
+
+            InspectionReport report = InspectApi.Inspect(_world, InspectMode.World);
+
+            Assert.IsFalse(Mentions(report, "RespawnHeightY"));
+        }
+
+        [Test]
+        public void ReportsTheDefaultReferenceCameraBehaviour()
+        {
+            InspectionReport report = InspectApi.Inspect(_world, InspectMode.World);
+
+            Assert.IsTrue(Mentions(report, "No Reference Camera"));
+        }
+
+        [Test]
         public void ReportsAReferenceCameraWithNoCameraComponent()
         {
             var broken = new GameObject("NotACamera");
@@ -128,6 +177,37 @@ namespace SabaTools.Inspect.World.SdkTests
 
             Assert.Greater(report.ErrorCount, 0);
             Assert.IsTrue(Mentions(report, "no Camera component"));
+        }
+
+        [Test]
+        public void ReportsAReferenceCameraWithAnExcessiveNearClipPlane()
+        {
+            var reference = new GameObject("ReferenceCamera");
+            reference.transform.SetParent(_world.transform);
+            reference.AddComponent<Camera>().nearClipPlane = 0.1f;
+            _world.GetComponent<VRCSceneDescriptor>().ReferenceCamera = reference;
+
+            InspectionReport report = InspectApi.Inspect(_world, InspectMode.World);
+
+            Assert.IsTrue(Mentions(report, "near clip plane"));
+            Assert.IsTrue(HasRow(report, "World", "Reference Camera", "ReferenceCamera"));
+        }
+
+        [Test]
+        public void ReportsActiveMirrorsAndTheAdvisoryThreshold()
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                var mirror = new GameObject("Mirror" + i);
+                mirror.transform.SetParent(_world.transform);
+                mirror.AddComponent<VRCMirrorReflection>();
+            }
+
+            InspectionReport report = InspectApi.Inspect(_world, InspectMode.World);
+
+            Assert.IsTrue(HasRow(report, "World", "Mirrors (active / total)", "3 / 3"));
+            Assert.IsTrue(Mentions(report, "enabled when the scene loads"));
+            Assert.IsTrue(Mentions(report, "own advisory threshold"));
         }
 
         [Test]
@@ -147,6 +227,19 @@ namespace SabaTools.Inspect.World.SdkTests
             foreach (InspectionItem item in report.Items)
             {
                 if (item.Message.Contains(fragment))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool HasRow(
+            InspectionReport report, string group, string label, string value)
+        {
+            foreach (StatRow row in report.Rows)
+            {
+                if (row.Group == group && row.Label == label && row.Value == value)
                 {
                     return true;
                 }
