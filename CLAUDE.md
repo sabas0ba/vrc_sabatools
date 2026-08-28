@@ -123,8 +123,9 @@ avatar / world パッケージに手を入れた場合は
 `./.github/verify/vrchat/run-tests.sh <avatars|worlds>` も実行する。前者はこの 2 つの
 パッケージの `Editor/Core` しか見ていないため、通っても SDK 依存部分は未検証である。
 
-同一リポジトリの CI で Unity licence が無い場合、`unity.yml` は失敗する。Unity 回帰試験を
-skip した success を作らないためであり、この gate を検査の都合で緩めないこと。
+CI で Unity licence が利用可能な場合、`unity.yml` は Unity 回帰試験を実行する。licence が
+無い場合は notice を残して Unity 試験手順を skip し、`verify.yml` を regression gate とする。
+この場合の `unity.yml` の成功表示を Unity 試験の成功と解釈しないこと。
 
 ファイルを追加した場合は `.github/scripts/run.sh .github/scripts/gen_meta.py` で
 `.meta` を生成してからコミットする。

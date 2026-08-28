@@ -76,9 +76,9 @@ UIの`Ping`は検査時に収集した位置情報から対象をEditor上で強
 合計75件です。これにRoslyn compile、documentation render、internal link、manifest、`.meta`、
 dependency purityの検査を加えます。
 
-同一repositoryのCIでUnity licenceが無い場合、Unity workflowは失敗します。secretを利用
-できないfork pull requestだけはUnity laneをskipし、非Unity回帰試験を利用可能なgateと
-します。
+CIでUnity licenceが利用可能な場合のみ、Unity workflowはUnity回帰試験を実行します。
+licenceが無い場合はnoticeを残してUnity試験手順をskipし、非Unity回帰試験をregression
+gateとします。この場合のUnity workflowの成功表示はUnity試験の成功を意味しません。
 
 ## 既知の限界
 

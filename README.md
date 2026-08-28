@@ -78,7 +78,7 @@ core は両モジュールのアセンブリを参照しません。`InspectionM
     │   └── vrchat/                 # SDK を hash 固定で取得する 2 レーンの検証
     └── workflows/
         ├── verify.yml              # PR ごとのオフライン検証
-        ├── unity.yml               # 実 Unity での EditMode テスト（licence 必須）
+        ├── unity.yml               # 実 Unity での EditMode テスト（licence がある場合）
         ├── build-release.yml       # タグを打つと zip を作って Release を発行
         └── build-listing.yml       # Release 発行時にリスティングを再生成して Pages へ
 ```
@@ -132,7 +132,7 @@ dotnet run \
 ./.github/verify/verify.sh
 
 # 2. 実 Unity (SDK 無し)。core の収集器と公開 API を実際の UnityEditor API で
-#    動かします。GitHub Actions では Unity licence を必須にします。
+#    動かします。GitHub Actions では licence がある場合のみ実行します。
 #    ローカルでは CIProject をそのまま Unity で開いて Test Runner を実行します。
 
 # 3. 実 Unity + 実 VRChat SDK。avatar / world モジュールを対象別のプロジェクトで
@@ -146,10 +146,9 @@ dotnet run \
 GitHub Actions の `Verify` は 1a を独立 job として表示し、1b の検証 job と並行して実行します。
 どちらの .NET 検査も `Dockerfile` から構築した固定 Nix profile 内で実行し、Host runner に
 .NET SDK または Nix を導入しません。Python 検査も digest 固定コンテナで実行します。
-`Unity` は 2 と 3 を実行します。同一リポジトリの pull request、`main` push、手動実行で
-`UNITY_LICENSE` / `UNITY_SERIAL` が無い場合は失敗し、試験を skip した状態を success として
-扱いません。GitHub が secrets を渡さない fork の pull request だけは Unity job を skip し、
-`Verify` を利用可能な回帰試験とします。
+`Unity` は 2 と 3 を実行します。`UNITY_LICENSE` / `UNITY_SERIAL` が利用可能な場合のみ実行し、
+利用できない場合は notice を残して Unity 回帰 job を skip します。この場合は `Verify` を
+regression gate とし、Unity workflow の結果を Unity 回帰試験の成功とは扱いません。
 
 新しいファイルを追加したら `.meta` を生成してからコミットします。GUID を固定しておかないと導入のたびに参照が壊れます。
 
