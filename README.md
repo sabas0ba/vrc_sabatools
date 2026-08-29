@@ -172,4 +172,4 @@ core に破壊的変更を入れる場合は、`avatar` / `world` の `vpmDepend
 
 ## ライセンス
 
-MIT License。詳細は [LICENSE](LICENSE) を参照してください。
+Apache License 2.0。詳細は [LICENSE](LICENSE) を参照してください。
