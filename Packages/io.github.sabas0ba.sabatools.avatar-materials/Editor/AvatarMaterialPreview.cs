@@ -787,8 +787,8 @@ namespace SabaTools.AvatarMaterials.Editors
 
         private void DrawOverlays(Rect rect, AvatarPreviewRenderOptions options)
         {
-            GUI.BeginGroup(rect);
             Handles.BeginGUI();
+            GUI.BeginGroup(rect);
             Rect localRect = new Rect(0f, 0f, rect.width, rect.height);
             if (options.DrawBounds)
             {
@@ -802,8 +802,8 @@ namespace SabaTools.AvatarMaterials.Editors
             {
                 DrawLightingOverlay(localRect);
             }
-            Handles.EndGUI();
             GUI.EndGroup();
+            Handles.EndGUI();
         }
 
         private void DrawBoundsOverlay(Rect rect, AvatarPreviewRenderOptions options)
@@ -879,8 +879,12 @@ namespace SabaTools.AvatarMaterials.Editors
                 {
                     string path = WithoutRoot(AvatarMaterialCatalog.RelativePath(
                         _instance.transform, renderer.transform));
-                    Handles.Label(position + new Vector2(4f, -4f),
-                        path + "\n" + string.Join(", ", queues.ToArray()), labelStyle);
+                    DrawOverlayLabel(
+                        rect,
+                        position + new Vector2(4f, -4f),
+                        path + "\n" + string.Join(", ", queues.ToArray()),
+                        labelStyle,
+                        280f);
                 }
             }
         }
@@ -911,10 +915,14 @@ namespace SabaTools.AvatarMaterials.Editors
                     DrawArrow(lightPosition, targetPosition, 2f, true);
                     Handles.DrawWireDisc(lightPosition, Vector3.forward, 7f);
                     Vector3 direction = LightVectorTowardTarget(light, _bounds.center);
-                    Handles.Label(lightPosition + new Vector2(8f, -8f),
+                    DrawOverlayLabel(
+                        rect,
+                        lightPosition + new Vector2(8f, -8f),
                         Text("Point光源 → Avatar", "Point source → avatar") + "  "
                         + light.intensity.ToString("0.00") + "\ndir "
-                        + FormatDirection(direction), labelStyle);
+                        + FormatDirection(direction),
+                        labelStyle,
+                        230f);
                 }
                 else if (light.type == LightType.Directional)
                 {
@@ -928,12 +936,40 @@ namespace SabaTools.AvatarMaterials.Editors
                         continue;
                     }
                     DrawArrow(start, end, 3f, false);
-                    Handles.Label(start + new Vector2(4f, -4f),
+                    DrawOverlayLabel(
+                        rect,
+                        start + new Vector2(4f, -4f),
                         Text("Directional光線", "Directional ray") + "  "
                         + light.intensity.ToString("0.00") + "\ndir "
-                        + FormatDirection(direction), labelStyle);
+                        + FormatDirection(direction),
+                        labelStyle,
+                        230f);
                 }
             }
+        }
+
+        private static void DrawOverlayLabel(
+            Rect bounds,
+            Vector2 anchor,
+            string text,
+            GUIStyle style,
+            float preferredWidth)
+        {
+            var content = new GUIContent(text);
+            float availableWidth = Mathf.Max(bounds.width - 8f, 1f);
+            float width = Mathf.Min(
+                Mathf.Max(style.CalcSize(content).x + 8f, 100f),
+                Mathf.Min(preferredWidth, availableWidth));
+            float height = Mathf.Max(
+                style.lineHeight * text.Split('\n').Length + 6f,
+                20f);
+            var labelRect = new Rect(
+                Mathf.Clamp(anchor.x, 4f, Mathf.Max(bounds.width - width - 4f, 4f)),
+                Mathf.Clamp(anchor.y, 4f, Mathf.Max(bounds.height - height - 4f, 4f)),
+                width,
+                height);
+            EditorGUI.DrawRect(labelRect, new Color(0f, 0f, 0f, 0.68f));
+            GUI.Label(labelRect, content, style);
         }
 
         internal static Vector3 LightVectorTowardTarget(Light light, Vector3 target)
