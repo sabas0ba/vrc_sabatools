@@ -152,6 +152,44 @@ namespace SabaTools.Inspect.Avatar.SdkTests
         }
 
         [Test]
+        public void PreviewDefaultsToSceneViewFollowAndClampsUiScale()
+        {
+            Assert.AreEqual(
+                AvatarPreviewCameraMode.SceneViewFollow,
+                AvatarMaterialStudioWindow.DefaultCameraMode);
+            Assert.AreEqual(
+                135f, AvatarMaterialStudioWindow.ScalePreviewDimension(180f, 0.5f));
+            Assert.AreEqual(
+                180f, AvatarMaterialStudioWindow.ScalePreviewDimension(180f, 1f));
+            Assert.AreEqual(
+                360f, AvatarMaterialStudioWindow.ScalePreviewDimension(180f, 3f));
+        }
+
+        [Test]
+        public void LightingGizmoVectorsFollowRaysFromTheirSources()
+        {
+            Light directional = CreateGameObject("DirectionalLight").AddComponent<Light>();
+            directional.type = LightType.Directional;
+            directional.transform.rotation = Quaternion.Euler(25f, 40f, 0f);
+            Assert.That(
+                Vector3.Dot(
+                    directional.transform.forward,
+                    AvatarMaterialPreview.LightVectorTowardTarget(
+                        directional, _avatar.transform.position)),
+                Is.EqualTo(1f).Within(0.0001f));
+
+            Light point = CreateGameObject("PointLight").AddComponent<Light>();
+            point.type = LightType.Point;
+            point.transform.position = new Vector3(2f, 1f, -3f);
+            Vector3 target = new Vector3(-1f, 2f, 1f);
+            Assert.That(
+                Vector3.Dot(
+                    (target - point.transform.position).normalized,
+                    AvatarMaterialPreview.LightVectorTowardTarget(point, target)),
+                Is.EqualTo(1f).Within(0.0001f));
+        }
+
+        [Test]
         public void RenderQueueDiagnosticsReportsOpaqueMaterialInTransparentRange()
         {
             Shader shader = Shader.Find("Standard");

@@ -157,7 +157,7 @@ namespace SabaTools.AvatarMaterials.Editors
         {
             Draw(rect, lighting, new AvatarPreviewRenderOptions
             {
-                CameraMode = AvatarPreviewCameraMode.Orbit,
+                CameraMode = AvatarPreviewCameraMode.SceneViewFollow,
                 QueueVisibility = RenderQueueVisibilityMode.ShowAll,
                 QueueRange = new Vector2Int(0, 5000),
             });
@@ -890,6 +890,7 @@ namespace SabaTools.AvatarMaterials.Editors
             var labelStyle = new GUIStyle(EditorStyles.miniBoldLabel)
             {
                 normal = { textColor = Color.white },
+                clipping = TextClipping.Clip,
             };
             foreach (Light light in _utility.lights)
             {
@@ -901,41 +902,89 @@ namespace SabaTools.AvatarMaterials.Editors
                 Handles.color = new Color(light.color.r, light.color.g, light.color.b, 1f);
                 if (light.type == LightType.Point)
                 {
-                    if (!TryProject(rect, light.transform.position, out Vector2 lightPosition))
+                    if (!TryProjectClamped(
+                            rect, light.transform.position, 10f, out Vector2 lightPosition)
+                        || !TryProject(rect, _bounds.center, out Vector2 targetPosition))
                     {
                         continue;
                     }
-                    if (TryProject(rect, _bounds.center, out Vector2 targetPosition))
-                    {
-                        Handles.DrawDottedLine(lightPosition, targetPosition, 4f);
-                    }
+                    DrawArrow(lightPosition, targetPosition, 2f, true);
                     Handles.DrawWireDisc(lightPosition, Vector3.forward, 7f);
+                    Vector3 direction = LightVectorTowardTarget(light, _bounds.center);
                     Handles.Label(lightPosition + new Vector2(8f, -8f),
-                        Text("Point Light", "Point Light") + "  "
-                        + light.intensity.ToString("0.00"), labelStyle);
+                        Text("Point光源 → Avatar", "Point source → avatar") + "  "
+                        + light.intensity.ToString("0.00") + "\ndir "
+                        + FormatDirection(direction), labelStyle);
                 }
                 else if (light.type == LightType.Directional)
                 {
-                    Vector3 direction = light.transform.forward;
-                    float length = Mathf.Max(_bounds.extents.magnitude * 1.2f, 0.5f);
+                    Vector3 direction = LightVectorTowardTarget(light, _bounds.center);
+                    float length = Mathf.Max(_bounds.extents.magnitude * 1.4f, 0.65f);
                     Vector3 worldStart = _bounds.center - direction * length;
-                    Vector3 worldEnd = _bounds.center - direction * length * 0.15f;
-                    if (!TryProject(rect, worldStart, out Vector2 start)
-                        || !TryProject(rect, worldEnd, out Vector2 end))
+                    Vector3 worldEnd = _bounds.center + direction * length * 0.2f;
+                    if (!TryProjectClamped(rect, worldStart, 10f, out Vector2 start)
+                        || !TryProjectClamped(rect, worldEnd, 10f, out Vector2 end))
                     {
                         continue;
                     }
-                    Handles.DrawAAPolyLine(3f, start, end);
-                    Vector2 arrow = (end - start).normalized;
-                    Vector2 perpendicular = new Vector2(-arrow.y, arrow.x);
-                    Handles.DrawAAConvexPolygon(
-                        end, end - arrow * 10f + perpendicular * 5f,
-                        end - arrow * 10f - perpendicular * 5f);
+                    DrawArrow(start, end, 3f, false);
                     Handles.Label(start + new Vector2(4f, -4f),
-                        Text("Directional Light", "Directional Light") + "  "
-                        + light.intensity.ToString("0.00"), labelStyle);
+                        Text("Directional光線", "Directional ray") + "  "
+                        + light.intensity.ToString("0.00") + "\ndir "
+                        + FormatDirection(direction), labelStyle);
                 }
             }
+        }
+
+        internal static Vector3 LightVectorTowardTarget(Light light, Vector3 target)
+        {
+            if (light == null)
+            {
+                return Vector3.zero;
+            }
+            if (light.type == LightType.Directional)
+            {
+                return light.transform.forward.normalized;
+            }
+
+            Vector3 towardTarget = target - light.transform.position;
+            return towardTarget.sqrMagnitude > 0.000001f
+                ? towardTarget.normalized
+                : Vector3.zero;
+        }
+
+        private static void DrawArrow(
+            Vector2 start, Vector2 end, float lineWidth, bool dotted)
+        {
+            Vector2 delta = end - start;
+            if (delta.sqrMagnitude < 1f)
+            {
+                return;
+            }
+
+            if (dotted)
+            {
+                Handles.DrawDottedLine(start, end, 4f);
+            }
+            else
+            {
+                Handles.DrawAAPolyLine(lineWidth, start, end);
+            }
+
+            float arrowLength = Mathf.Min(12f, delta.magnitude * 0.35f);
+            Vector2 direction = delta.normalized;
+            Vector2 perpendicular = new Vector2(-direction.y, direction.x);
+            Handles.DrawAAConvexPolygon(
+                end,
+                end - direction * arrowLength + perpendicular * arrowLength * 0.45f,
+                end - direction * arrowLength - perpendicular * arrowLength * 0.45f);
+        }
+
+        private static string FormatDirection(Vector3 direction)
+        {
+            return "(" + direction.x.ToString("0.00") + ", "
+                + direction.y.ToString("0.00") + ", "
+                + direction.z.ToString("0.00") + ")";
         }
 
         private void DrawWireBounds(Rect rect, Bounds bounds)
@@ -974,6 +1023,16 @@ namespace SabaTools.AvatarMaterials.Editors
             return viewport.z > 0f
                 && guiPosition.x >= 0f && guiPosition.x <= rect.width
                 && guiPosition.y >= 0f && guiPosition.y <= rect.height;
+        }
+
+        private bool TryProjectClamped(
+            Rect rect, Vector3 worldPosition, float margin, out Vector2 guiPosition)
+        {
+            Vector3 viewport = _utility.camera.WorldToViewportPoint(worldPosition);
+            guiPosition = new Vector2(
+                Mathf.Clamp(viewport.x * rect.width, margin, rect.width - margin),
+                Mathf.Clamp((1f - viewport.y) * rect.height, margin, rect.height - margin));
+            return viewport.z > 0f;
         }
 
         private string Text(string japanese, string english)

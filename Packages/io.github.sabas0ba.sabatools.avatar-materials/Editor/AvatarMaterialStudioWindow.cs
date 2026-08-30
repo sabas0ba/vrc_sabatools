@@ -21,6 +21,11 @@ namespace SabaTools.AvatarMaterials.Editors
 
     public sealed class AvatarMaterialStudioWindow : EditorWindow
     {
+        internal const AvatarPreviewCameraMode DefaultCameraMode =
+            AvatarPreviewCameraMode.SceneViewFollow;
+        internal const float MinimumPreviewUiScale = 0.75f;
+        internal const float MaximumPreviewUiScale = 2f;
+
         private readonly AvatarMaterialPreview _preview = new AvatarMaterialPreview();
         private readonly List<MaterialSlotEntry> _slots = new List<MaterialSlotEntry>();
         private readonly List<TextureUsageEntry> _textureInventory = new List<TextureUsageEntry>();
@@ -46,7 +51,10 @@ namespace SabaTools.AvatarMaterials.Editors
         private AvatarMaterialWorkspace _workspace;
         private AvatarMaterialDetail _materialDetail;
         private AvatarPreviewMode _previewMode;
-        private AvatarPreviewCameraMode _cameraMode;
+        [SerializeField]
+        private AvatarPreviewCameraMode _cameraMode = DefaultCameraMode;
+        [SerializeField]
+        private float _previewUiScale = 1f;
         private float _transparencyProbeAlpha = 0.35f;
         private float _transparencyProbeDistance = 0.45f;
         private bool _transparencyProbeZWrite;
@@ -515,8 +523,12 @@ namespace SabaTools.AvatarMaterials.Editors
 
             AvatarLightingScenario[] scenarios =
                 (AvatarLightingScenario[])System.Enum.GetValues(typeof(AvatarLightingScenario));
-            int columns = Mathf.Clamp(Mathf.FloorToInt((position.width - 24f) / 300f), 1, 4);
-            float cellWidth = Mathf.Max(240f, (position.width - 22f - 6f * (columns - 1)) / columns);
+            float desiredCellWidth = ScalePreviewDimension(300f, _previewUiScale);
+            int columns = Mathf.Clamp(
+                Mathf.FloorToInt((position.width - 24f) / desiredCellWidth), 1, 4);
+            float cellWidth = Mathf.Max(
+                ScalePreviewDimension(240f, _previewUiScale),
+                (position.width - 22f - 6f * (columns - 1)) / columns);
 
             _visualizationScroll = EditorGUILayout.BeginScrollView(_visualizationScroll);
             for (int row = 0; row * columns < scenarios.Length; row++)
@@ -540,7 +552,9 @@ namespace SabaTools.AvatarMaterials.Editors
                                 LightingScenarioName(scenario),
                                 EditorStyles.boldLabel);
                             Rect previewRect = GUILayoutUtility.GetRect(
-                                cellWidth - 12f, 215f, GUILayout.ExpandWidth(true));
+                                cellWidth - 12f,
+                                ScalePreviewDimension(215f, _previewUiScale),
+                                GUILayout.ExpandWidth(true));
                             _preview.Draw(previewRect, scenario, CreatePreviewOptions());
                         }
                     }
@@ -551,19 +565,30 @@ namespace SabaTools.AvatarMaterials.Editors
 
         private void DrawCameraControls()
         {
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                _cameraMode = (AvatarPreviewCameraMode)EditorGUILayout.Popup(
-                    T("カメラ", "Camera"), (int)_cameraMode,
-                    new[] { T("オービット", "Orbit"), T("自由移動", "Free Fly"),
-                        T("Sceneビュー追従", "Scene View Follow") },
-                    GUILayout.MaxWidth(310f));
-                if (GUILayout.Button(T("カメラをリセット", "Reset Camera"), GUILayout.Width(112f)))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    _preview.ResetCamera();
-                    Repaint();
+                    _cameraMode = (AvatarPreviewCameraMode)EditorGUILayout.Popup(
+                        T("カメラ", "Camera"), (int)_cameraMode,
+                        new[] { T("オービット", "Orbit"), T("自由移動", "Free Fly"),
+                            T("Sceneビュー追従", "Scene View Follow") },
+                        GUILayout.MaxWidth(310f));
+                    if (GUILayout.Button(
+                            T("カメラをリセット", "Reset Camera"), GUILayout.Width(112f)))
+                    {
+                        _preview.ResetCamera();
+                        Repaint();
+                    }
+                    _previewUiScale = EditorGUILayout.Slider(
+                        T("View UI倍率", "View UI Scale"), _previewUiScale,
+                        MinimumPreviewUiScale, MaximumPreviewUiScale,
+                        GUILayout.MaxWidth(285f));
+                    if (GUILayout.Button("100%", GUILayout.Width(48f)))
+                    {
+                        _previewUiScale = 1f;
+                    }
                 }
-                GUILayout.FlexibleSpace();
                 string help = _cameraMode == AvatarPreviewCameraMode.FreeFly
                     ? T("右ドラッグ: 視点 / 中ドラッグ: 平行移動 / Wheel: 前後",
                         "RMB: look / MMB: pan / Wheel: forward-back")
@@ -572,9 +597,14 @@ namespace SabaTools.AvatarMaterials.Editors
                             "Follows the last active Scene view camera")
                         : T("左ドラッグ: 回転 / 中ドラッグ: 平行移動 / Wheel: Zoom",
                             "LMB: orbit / MMB: pan / Wheel: zoom");
-                EditorGUILayout.LabelField(
-                    help, EditorStyles.miniLabel, GUILayout.Width(310f));
+                EditorGUILayout.LabelField(help, EditorStyles.miniLabel);
             }
+        }
+
+        internal static float ScalePreviewDimension(float baseDimension, float scale)
+        {
+            return baseDimension * Mathf.Clamp(
+                scale, MinimumPreviewUiScale, MaximumPreviewUiScale);
         }
 
         private AvatarPreviewRenderOptions CreatePreviewOptions()
@@ -679,12 +709,17 @@ namespace SabaTools.AvatarMaterials.Editors
                 {
                     foreach (RenderQueueVisibilityMode mode in modes)
                     {
-                        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                        using (new EditorGUILayout.VerticalScope(
+                                   EditorStyles.helpBox,
+                                   GUILayout.MinWidth(ScalePreviewDimension(
+                                       180f, _previewUiScale) + 12f)))
                         {
                             EditorGUILayout.LabelField(QueueVisibilityName(mode),
                                 EditorStyles.boldLabel);
                             Rect previewRect = GUILayoutUtility.GetRect(
-                                180f, 162f, GUILayout.ExpandWidth(true));
+                                ScalePreviewDimension(180f, _previewUiScale),
+                                ScalePreviewDimension(162f, _previewUiScale),
+                                GUILayout.ExpandWidth(true));
                             _preview.Draw(previewRect,
                                 AvatarLightingScenario.DirectionalNeutral,
                                 new AvatarPreviewRenderOptions
@@ -792,14 +827,19 @@ namespace SabaTools.AvatarMaterials.Editors
                     {
                         int queue = queues[row * columns + column];
                         using (new EditorGUILayout.VerticalScope(
-                                   EditorStyles.helpBox, GUILayout.ExpandWidth(true)))
+                                   EditorStyles.helpBox,
+                                   GUILayout.MinWidth(ScalePreviewDimension(
+                                       230f, _previewUiScale) + 12f),
+                                   GUILayout.ExpandWidth(true)))
                         {
                             EditorGUILayout.LabelField(
                                 T("Probe Queue ", "Probe queue ") + queue + " ("
                                 + AvatarRenderDiagnostics.QueueName(queue) + ")",
                                 EditorStyles.boldLabel);
                             Rect previewRect = GUILayoutUtility.GetRect(
-                                230f, 210f, GUILayout.ExpandWidth(true));
+                                ScalePreviewDimension(230f, _previewUiScale),
+                                ScalePreviewDimension(210f, _previewUiScale),
+                                GUILayout.ExpandWidth(true));
                             AvatarPreviewRenderOptions options = CreateQueuePreviewOptions(queue);
                             _preview.Draw(
                                 previewRect, AvatarLightingScenario.DirectionalNeutral, options);
@@ -1027,7 +1067,10 @@ namespace SabaTools.AvatarMaterials.Editors
                     for (int column = 0; column < 2; column++)
                     {
                         int index = row * 2 + column;
-                        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                        using (new EditorGUILayout.VerticalScope(
+                                   EditorStyles.helpBox,
+                                   GUILayout.MinWidth(ScalePreviewDimension(
+                                       230f, _previewUiScale) + 12f)))
                         {
                             if (index < 3)
                             {
@@ -1062,7 +1105,9 @@ namespace SabaTools.AvatarMaterials.Editors
                     "The selected renderer bounds is outside this probe frustum."), MessageType.Error);
             }
             Rect previewRect = GUILayoutUtility.GetRect(
-                230f, 220f, GUILayout.ExpandWidth(true));
+                ScalePreviewDimension(230f, _previewUiScale),
+                ScalePreviewDimension(220f, _previewUiScale),
+                GUILayout.ExpandWidth(true));
             var options = new AvatarPreviewRenderOptions
             {
                 CameraOverride = true,
@@ -1085,7 +1130,10 @@ namespace SabaTools.AvatarMaterials.Editors
             EditorGUILayout.LabelField(T("ユーザーカメラ", "User Camera"), EditorStyles.boldLabel);
             EditorGUILayout.LabelField(T("固定Probe判定には影響しません。", "Does not modify fixed probe results."),
                 EditorStyles.wordWrappedMiniLabel);
-            Rect previewRect = GUILayoutUtility.GetRect(230f, 220f, GUILayout.ExpandWidth(true));
+            Rect previewRect = GUILayoutUtility.GetRect(
+                ScalePreviewDimension(230f, _previewUiScale),
+                ScalePreviewDimension(220f, _previewUiScale),
+                GUILayout.ExpandWidth(true));
             _preview.Draw(previewRect, AvatarLightingScenario.DirectionalNeutral,
                 new AvatarPreviewRenderOptions
                 {
@@ -1154,7 +1202,10 @@ namespace SabaTools.AvatarMaterials.Editors
                 side[index] = new Vector2(Vector3.Dot(relative, horizontalDirection), relative.y);
             }
 
-            Rect outer = GUILayoutUtility.GetRect(300f, 230f, GUILayout.ExpandWidth(true));
+            Rect outer = GUILayoutUtility.GetRect(
+                ScalePreviewDimension(300f, _previewUiScale),
+                ScalePreviewDimension(230f, _previewUiScale),
+                GUILayout.ExpandWidth(true));
             if (Event.current.type == EventType.Repaint)
             {
                 EditorGUI.DrawRect(outer, new Color(0.10f, 0.10f, 0.10f));
