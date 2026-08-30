@@ -787,7 +787,6 @@ namespace SabaTools.AvatarMaterials.Editors
 
         private void DrawOverlays(Rect rect, AvatarPreviewRenderOptions options)
         {
-            Handles.BeginGUI();
             GUI.BeginGroup(rect);
             Rect localRect = new Rect(0f, 0f, rect.width, rect.height);
             if (options.DrawBounds)
@@ -803,7 +802,6 @@ namespace SabaTools.AvatarMaterials.Editors
                 DrawLightingOverlay(localRect);
             }
             GUI.EndGroup();
-            Handles.EndGUI();
         }
 
         private void DrawBoundsOverlay(Rect rect, AvatarPreviewRenderOptions options)
