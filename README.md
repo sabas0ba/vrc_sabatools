@@ -2,9 +2,9 @@
 
 VRChat 向けの**アバター／ワールド編集用ユーティリティ**を **VCC (VRChat Creator Companion) / VPM** で配布するためのリポジトリです。
 
-複数パッケージの集合体として育てていく前提の構成です。第一弾として、非破壊の検査ツール **SabaTools Inspect** を収録しています。
+複数パッケージの集合体として育てていく前提の構成です。非破壊の検査ツール **SabaTools Inspect** と、書き込み可能な **SabaTools Avatar Material Studio** を収録しています。
 
-パッケージは対象別に 3 つに分かれています。VRChat の Avatars SDK と Worlds SDK は同一プロジェクトでの併用が想定されていないため、SDK に依存する部分をプロジェクトの種類ごとに切り離してあります。
+SabaTools Inspect は対象別に 3 パッケージへ分かれています。VRChat の Avatars SDK と Worlds SDK は同一プロジェクトでの併用が想定されていないため、SDK に依存する部分をプロジェクトの種類ごとに切り離してあります。Scene／Asset を変更する Material Studio は、Inspect の非破壊性を維持するため独立したパッケージです。
 
 `vrc_sabaprops` (アセット) / `vrc_sabashader` (シェーダー) と同じ配布・検証の構成を踏襲しており、こちらは「編集を助ける Editor 拡張」を担当します。
 
@@ -31,19 +31,20 @@ https://sabas0ba.github.io/vrc_sabatools/index.json
 | --- | --- | --- | --- |
 | `io.github.sabas0ba.sabatools.core` | SabaTools Inspect Core | なし | 統計、Missing 参照の検出、レポート出力。単体で完結します |
 | `io.github.sabas0ba.sabatools.avatar` | SabaTools Inspect for Avatars | `com.vrchat.avatars` | `VRCAvatarDescriptor` を型で読む検査を追加します |
+| `io.github.sabas0ba.sabatools.avatar-materials` | SabaTools Avatar Material Studio | `com.vrchat.avatars`、`jp.lilxyzw.liltoon` | Material／Texture編集、照明・Fallback・Quest・Render Queue・Bounds preview |
 | `io.github.sabas0ba.sabatools.world` | SabaTools Inspect for Worlds | `com.vrchat.worlds` | `VRCSceneDescriptor` を型で読む検査を追加します |
 
-**どれを入れるか**: アバター用プロジェクトなら `avatar`、ワールド用なら `world` を入れてください。`core` は依存として自動的に入ります。SDK を使わないプロジェクトや、統計と Missing 参照の検出だけで足りる場合は `core` 単体で構いません。`avatar` と `world` を同時に入れる必要はなく、入れると両方の SDK がプロジェクトへ引き込まれます。
+**どれを入れるか**: 非破壊検査はアバター用プロジェクトなら `avatar`、ワールド用なら `world` を入れてください。`core` は依存として自動的に入ります。Material 編集と表示比較が必要なアバタープロジェクトには `avatar-materials` を追加します。これは Inspect へ依存せず単独でも導入できます。`avatar` と `world` を同時に入れる必要はなく、入れると両方の SDK がプロジェクトへ引き込まれます。
 
 各パッケージの詳細は `Packages/<package-id>/README.md` を参照してください。
 
 導入後の最短手順は `Tools > SabaTools > Inspect Window` です。対象を指定して Scan するだけで、シーンには何も書き込みません。
 
-### 3 つに分けている理由
+### Inspect を 3 つに分けている理由
 
 `vpmDependencies` は VCC が実際に解決してインストールします。1 つのパッケージが `com.vrchat.avatars` を宣言すれば、それを入れたワールドプロジェクトにもアバター SDK が入ります。両 SDK の同居は公式にサポートされていないため、SDK 依存を持つ部分を対象別に切り離しています。
 
-分割の軸を「ツールの種類」ではなく「対象」にしているのは、SDK がプロジェクト単位の硬い制約である一方、ツールの種類は分類にすぎないためです。この軸であれば、収録ツールが増えてもパッケージは 3 つのままです。
+Inspect 内の分割軸を「ツールの種類」ではなく「対象」にしているのは、SDK がプロジェクト単位の硬い制約である一方、検査の種類は分類にすぎないためです。一方、書き込み可能な機能は利用者が操作の影響範囲を導入時点で判別できるよう、非破壊の Inspect へ混在させません。
 
 core は両モジュールのアセンブリを参照しません。`InspectionModule` を継承した型を `UnityEditor.TypeCache` で拾うため、依存の矢印は avatar → core、world → core の一方向だけです。
 
@@ -60,6 +61,7 @@ core は両モジュールのアセンブリを参照しません。`InspectionM
 │   │       ├── Core/               # Unity 非依存のロジック（判定・推定・レポート）
 │   │       └── *.cs                # Unity に依存する収集器とウィンドウ、拡張点
 │   ├── io.github.sabas0ba.sabatools.avatar/
+│   ├── io.github.sabas0ba.sabatools.avatar-materials/
 │   └── io.github.sabas0ba.sabatools.world/
 ├── Website/                        # GitHub Pages で公開するリスティングサイト
 ├── docs/design.md                  # package境界・非破壊性・検証階層の設計文書
@@ -135,7 +137,7 @@ dotnet run \
 #    動かします。GitHub Actions では licence がある場合のみ実行します。
 #    ローカルでは CIProject をそのまま Unity で開いて Test Runner を実行します。
 
-# 3. 実 Unity + 実 VRChat SDK。avatar / world モジュールを対象別のプロジェクトで
+# 3. 実 Unity + 実 VRChat SDK。avatar 向けツール / world モジュールを対象別のプロジェクトで
 #    検証します。SDK は SHA256 で固定して取得します。
 ./.github/verify/vrchat/run-tests.sh worlds
 ./.github/verify/vrchat/run-tests.sh avatars

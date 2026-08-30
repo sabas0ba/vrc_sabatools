@@ -31,22 +31,28 @@ container 内で実行する。Windows の Host tool は Podman と Unity のみ
 
 ## パッケージの分割
 
-パッケージは対象別に 3 つある。この境界は VRChat SDK の制約そのものであり、動かさない。
+非破壊検査のパッケージは対象別に 3 つある。この境界は VRChat SDK の制約そのものであり、動かさない。
+書き込み可能な機能は、検査の非破壊性を維持する別パッケージとして扱う。
 
 | パッケージ | vpmDependencies | 役割 |
 | --- | --- | --- |
 | `sabatools.core` | なし | 収集・レポート・ウィンドウ・拡張点 |
 | `sabatools.avatar` | core, `com.vrchat.avatars` | `VRCAvatarDescriptor` を型で読む検査 |
+| `sabatools.avatar-materials` | `com.vrchat.avatars`、`jp.lilxyzw.liltoon` | Material／Texture編集と非保存Preview |
 | `sabatools.world` | core, `com.vrchat.worlds` | `VRCSceneDescriptor` を型で読む検査 |
+
+avatar-materialsのcamera移動、Render Queue filter、半透明probe、bounds overlayは
+Preview cloneだけへ適用し、Sceneやsource Rendererを変更しない。Render Queue値の明示編集だけが
+Material assetへUndo付きで書き込む。Boundsの48方向検査はViewPosition基準のAABB frustum近似とする。
 
 - **core に SDK 依存を持ち込まない**。`vpmDependencies` に VRChat SDK を足した時点で、
   core を入れた全プロジェクトにその SDK が入る。両 SDK の同居は想定されていない
 - **依存の矢印は avatar → core / world → core の一方向のみ**。core は両モジュールの
   アセンブリを参照せず、`UnityEditor.TypeCache` で `InspectionModule` の派生型を拾う。
   core 側に avatar / world の asmdef 参照を足さないこと
-- **分割の軸は対象であり、ツールの種類ではない**。ツールを増やす場合は既存 3 パッケージ
-  のいずれかにフォルダと名前空間を足す。パッケージを増やすのは、新しい SDK 依存が
-  生じたときだけである
+- **検査内の分割軸は対象であり、検査の種類ではない**。読み取り専用の検査を増やす場合は
+  既存 3 パッケージのいずれかにフォルダと名前空間を足す。書き込み可能な機能を Inspect の
+  assemblyへ追加しない
 
 ## Editor/Core の純粋性
 
@@ -55,8 +61,9 @@ container 内で実行する。Windows の Host tool は Podman と Unity のみ
 検証できる。`verify.sh` はこの制約自体を検査するので、Unity の型が必要になった時点で
 その処理は `Editor` 直下に置くべきものである。
 
-avatar / world パッケージではこの制約の重みが core より大きい。`verify.sh` が届くのは
-両パッケージの `Editor/Core` だけであり、それ以外は実 SDK のレーンでしか検証されない。
+avatar / avatar-materials / world パッケージではこの制約の重みが core より大きい。
+`verify.sh` が届くのは各パッケージの `Editor/Core` だけであり、それ以外は実 SDK の
+レーンでしか検証されない。
 新しい判定を足すときは、まず純粋な計算として `Editor/Core` に書けないか検討すること。
 
 検査を通すために検査自体を削除しない。
@@ -68,7 +75,8 @@ avatar / world パッケージではこの制約の重みが core より大き�
 `VrcComponentCensus` が型名で数えており、core 側に asmdef 参照や `defineConstraints` を
 足すとこの要件が壊れる。
 
-avatar / world の `vpmDependencies` は SDK の**下限**のみを宣言する (`>=3.10.4`)。VPM は
+avatar / avatar-materials / world の `vpmDependencies` は依存の**下限**のみを宣言する
+（SDKは`>=3.10.4`、lilToonは`>=2.3.4`）。VPM は
 範囲指定しか書けず、厳密に固定すると利用者側の SDK 更新を壊す。厳密な固定は
 `.github/verify/vrchat/packages.<lane>.lock` の URL + SHA256 が担う。この二段構えを
 崩さないこと。
@@ -119,9 +127,10 @@ dotnet run \
 ./.github/verify/verify.sh
 ```
 
-avatar / world パッケージに手を入れた場合は
-`./.github/verify/vrchat/run-tests.sh <avatars|worlds>` も実行する。前者はこの 2 つの
-パッケージの `Editor/Core` しか見ていないため、通っても SDK 依存部分は未検証である。
+avatar / avatar-materials / world パッケージに手を入れた場合は
+`./.github/verify/vrchat/run-tests.sh <avatars|worlds>` も実行する。avatar と
+avatar-materials は `avatars`、world は `worlds` を選ぶ。前段の Unity 非依存検証は
+SDK package の `Editor/Core` しか見ていないため、通っても SDK 依存部分は未検証である。
 
 CI で Unity licence が利用可能な場合、`unity.yml` は Unity 回帰試験を実行する。licence が
 無い場合は notice を残して Unity 試験手順を skip し、`verify.yml` を regression gate とする。

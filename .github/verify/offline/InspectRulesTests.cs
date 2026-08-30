@@ -11,6 +11,7 @@
 // UnityEngine reference assemblies, and run for real in the Unity workflow.
 using System;
 using System.Collections.Generic;
+using SabaTools.AvatarMaterials;
 using SabaTools.Inspect;
 using SabaTools.Inspect.Avatar;
 using SabaTools.Inspect.World;
@@ -46,6 +47,9 @@ internal static class InspectRulesTests
         AvatarLimitConstantsRemainStable();
         RespawnHeightIsComparedAgainstGeometry();
         WorldLimitConstantsRemainStable();
+        ExplicitFallbackTagsTakePriority();
+        LegacyFallbackHeuristicsRemainDeterministic();
+        QuestShaderAllowListRejectsPcOnlyVariants();
 
         if (_failures > 0)
         {
@@ -54,6 +58,64 @@ internal static class InspectRulesTests
         }
         Console.WriteLine("ok: all offline checks passed");
         return 0;
+    }
+
+    // -----------------------------------------------------------------------
+    // Avatar Material Studio shader simulation
+    // -----------------------------------------------------------------------
+
+    private static void ExplicitFallbackTagsTakePriority()
+    {
+        AreEqual(
+            FallbackShaderKind.ToonStandard,
+            AvatarShaderRules.ResolveFallback(
+                "toonstandard", "Custom/Transparent", false, true, false),
+            "explicit fallback tag wins over shader heuristics");
+        AreEqual(
+            FallbackShaderKind.Hidden,
+            AvatarShaderRules.ResolveFallback(
+                "Hidden", "Custom/Toon", true, false, false),
+            "hidden fallback tag");
+        AreEqual(
+            FallbackShaderKind.Standard,
+            AvatarShaderRules.ResolveFallback(
+                "NotADocumentedTag", "Custom/Toon", true, false, false),
+            "unknown explicit tags use Standard");
+    }
+
+    private static void LegacyFallbackHeuristicsRemainDeterministic()
+    {
+        AreEqual(
+            FallbackShaderKind.ToonCutout,
+            AvatarShaderRules.ResolveFallback(
+                string.Empty, "Example/Toon Cutout", false, false, false),
+            "toon cutout name");
+        AreEqual(
+            FallbackShaderKind.Transparent,
+            AvatarShaderRules.ResolveFallback(
+                string.Empty, "Example/Surface", false, true, false),
+            "alpha blend keyword");
+        AreEqual(
+            FallbackShaderKind.Matcap,
+            AvatarShaderRules.ResolveFallback(
+                string.Empty, "Example/MatCap", false, false, false),
+            "matcap name");
+    }
+
+    private static void QuestShaderAllowListRejectsPcOnlyVariants()
+    {
+        IsTrue(
+            AvatarShaderRules.IsQuestAvatarShader("VRChat/Mobile/Toon Standard"),
+            "Quest Toon Standard");
+        IsTrue(
+            AvatarShaderRules.IsQuestAvatarShader("VRChat/Mobile/Standard Lite"),
+            "Quest Standard Lite");
+        IsFalse(
+            AvatarShaderRules.IsQuestAvatarShader("VRChat/Mobile/Toon Standard (Outline)"),
+            "outline is PC-only");
+        IsFalse(
+            AvatarShaderRules.IsQuestAvatarShader("Standard"),
+            "Unity Standard is not an Android avatar shader");
     }
 
     // -----------------------------------------------------------------------

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Assembles a Unity project holding the core package, one SDK-specific package
-# and the matching VRChat SDK, so the module in that package is compiled and
-# run against the real SDK types instead of being skipped.
+# Assembles a Unity project holding the core package, the matching SDK-specific
+# packages and the VRChat SDK, so their code is compiled and run against the
+# real SDK types instead of being skipped.
 #
 # The SDK comes from fetch.sh, which pins it by hash and runs in a container.
 # Only the Unity Editor itself is taken from the host.
@@ -30,11 +30,15 @@ case "$LANE" in
     avatars)
         SDK_PACKAGE="com.vrchat.avatars"
         TOOL_PACKAGE="io.github.sabas0ba.sabatools.avatar"
+        EXTRA_TOOL_PACKAGE="io.github.sabas0ba.sabatools.avatar-materials"
+        EXTRA_VPM_PACKAGE="jp.lilxyzw.liltoon"
         TESTS="$HERE/Tests/Avatar"
         ;;
     worlds)
         SDK_PACKAGE="com.vrchat.worlds"
         TOOL_PACKAGE="io.github.sabas0ba.sabatools.world"
+        EXTRA_TOOL_PACKAGE=""
+        EXTRA_VPM_PACKAGE=""
         TESTS="$HERE/Tests/World"
         ;;
     *)
@@ -50,7 +54,8 @@ if [ "${3:-}" = "--clean" ]; then
     rm -rf "$PROJECT"
 fi
 
-if [ ! -d "$VPM/$SDK_PACKAGE" ] || [ ! -d "$VPM/com.vrchat.base" ]; then
+if [ ! -d "$VPM/$SDK_PACKAGE" ] || [ ! -d "$VPM/com.vrchat.base" ] || \
+   { [ -n "$EXTRA_VPM_PACKAGE" ] && [ ! -d "$VPM/$EXTRA_VPM_PACKAGE" ]; }; then
     echo "fetching the pinned VRChat SDK ($LANE)"
     "$HERE/fetch.sh" "$LANE" "$VPM"
 fi
@@ -79,8 +84,14 @@ replace "$TESTS" "$PROJECT/Assets/SdkTests"
 replace "$REPO/Packages/io.github.sabas0ba.sabatools.core" \
     "$PROJECT/Packages/io.github.sabas0ba.sabatools.core"
 replace "$REPO/Packages/$TOOL_PACKAGE" "$PROJECT/Packages/$TOOL_PACKAGE"
+if [ -n "$EXTRA_TOOL_PACKAGE" ]; then
+    replace "$REPO/Packages/$EXTRA_TOOL_PACKAGE" "$PROJECT/Packages/$EXTRA_TOOL_PACKAGE"
+fi
 replace "$VPM/com.vrchat.base" "$PROJECT/Packages/com.vrchat.base"
 replace "$VPM/$SDK_PACKAGE" "$PROJECT/Packages/$SDK_PACKAGE"
+if [ -n "$EXTRA_VPM_PACKAGE" ]; then
+    replace "$VPM/$EXTRA_VPM_PACKAGE" "$PROJECT/Packages/$EXTRA_VPM_PACKAGE"
+fi
 
 # The Worlds SDK ships a scene template Unity cannot walk: the file name and
 # the type name inside disagree, so MonoScript.GetClass() returns null and
