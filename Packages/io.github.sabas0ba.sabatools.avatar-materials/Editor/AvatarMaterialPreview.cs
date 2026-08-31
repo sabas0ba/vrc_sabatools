@@ -70,7 +70,18 @@ namespace SabaTools.AvatarMaterials.Editors
 
     internal sealed class AvatarMaterialPreview
     {
+        private struct LightingGizmoState
+        {
+            internal LightType Type;
+            internal Vector3 Position;
+            internal Vector3 Direction;
+            internal Color Color;
+            internal float Intensity;
+        }
+
         private readonly List<Material> _ownedMaterials = new List<Material>();
+        private readonly List<LightingGizmoState> _lightingGizmos =
+            new List<LightingGizmoState>();
 
         private PreviewRenderUtility _utility;
         private GameObject _instance;
@@ -183,6 +194,7 @@ namespace SabaTools.AvatarMaterials.Editors
             ConfigureQueueVisibility(options.QueueVisibility, options.QueueRange);
             ConfigureCamera(rect, options);
             ConfigureTransparencyProbe(options);
+            CaptureLightingGizmos(options.DrawLightingGizmos);
 
             _utility.BeginPreview(rect, GUIStyle.none);
             _utility.camera.Render();
@@ -894,40 +906,40 @@ namespace SabaTools.AvatarMaterials.Editors
                 normal = { textColor = Color.white },
                 clipping = TextClipping.Clip,
             };
-            foreach (Light light in _utility.lights)
+            foreach (LightingGizmoState light in _lightingGizmos)
             {
-                if (light == null || !light.enabled || light.intensity <= 0f)
+                Handles.color = new Color(light.Color.r, light.Color.g, light.Color.b, 1f);
+                if (light.Type == LightType.Point)
                 {
-                    continue;
-                }
-
-                Handles.color = new Color(light.color.r, light.color.g, light.color.b, 1f);
-                if (light.type == LightType.Point)
-                {
-                    if (!TryProjectClamped(
-                            rect, light.transform.position, 10f, out Vector2 lightPosition)
-                        || !TryProject(rect, _bounds.center, out Vector2 targetPosition))
+                    if (!TryProject(rect, _bounds.center, out Vector2 targetPosition))
                     {
                         continue;
                     }
+                    if (!TryProjectClamped(
+                            rect, light.Position, 10f, out Vector2 lightPosition))
+                    {
+                        lightPosition = ProjectDirectionToRectEdge(
+                            rect,
+                            targetPosition,
+                            light.Position - _bounds.center,
+                            10f);
+                    }
                     DrawArrow(lightPosition, targetPosition, 2f, true);
                     Handles.DrawWireDisc(lightPosition, Vector3.forward, 7f);
-                    Vector3 direction = LightVectorTowardTarget(light, _bounds.center);
                     DrawOverlayLabel(
                         rect,
                         lightPosition + new Vector2(8f, -8f),
                         Text("Point光源 → Avatar", "Point source → avatar") + "  "
-                        + light.intensity.ToString("0.00") + "\ndir "
-                        + FormatDirection(direction),
+                        + light.Intensity.ToString("0.00") + "\ndir "
+                        + FormatDirection(light.Direction),
                         labelStyle,
                         230f);
                 }
-                else if (light.type == LightType.Directional)
+                else if (light.Type == LightType.Directional)
                 {
-                    Vector3 direction = LightVectorTowardTarget(light, _bounds.center);
                     float length = Mathf.Max(_bounds.extents.magnitude * 1.4f, 0.65f);
-                    Vector3 worldStart = _bounds.center - direction * length;
-                    Vector3 worldEnd = _bounds.center + direction * length * 0.2f;
+                    Vector3 worldStart = _bounds.center - light.Direction * length;
+                    Vector3 worldEnd = _bounds.center + light.Direction * length * 0.2f;
                     if (!TryProjectClamped(rect, worldStart, 10f, out Vector2 start)
                         || !TryProjectClamped(rect, worldEnd, 10f, out Vector2 end))
                     {
@@ -938,11 +950,37 @@ namespace SabaTools.AvatarMaterials.Editors
                         rect,
                         start + new Vector2(4f, -4f),
                         Text("Directional光線", "Directional ray") + "  "
-                        + light.intensity.ToString("0.00") + "\ndir "
-                        + FormatDirection(direction),
+                        + light.Intensity.ToString("0.00") + "\ndir "
+                        + FormatDirection(light.Direction),
                         labelStyle,
                         230f);
                 }
+            }
+        }
+
+        private void CaptureLightingGizmos(bool enabled)
+        {
+            _lightingGizmos.Clear();
+            if (!enabled)
+            {
+                return;
+            }
+
+            foreach (Light light in _utility.lights)
+            {
+                if (light == null || !light.enabled || light.intensity <= 0f)
+                {
+                    continue;
+                }
+
+                _lightingGizmos.Add(new LightingGizmoState
+                {
+                    Type = light.type,
+                    Position = light.transform.position,
+                    Direction = LightVectorTowardTarget(light, _bounds.center),
+                    Color = light.color,
+                    Intensity = light.intensity,
+                });
             }
         }
 
@@ -1067,6 +1105,28 @@ namespace SabaTools.AvatarMaterials.Editors
                 Mathf.Clamp(viewport.x * rect.width, margin, rect.width - margin),
                 Mathf.Clamp((1f - viewport.y) * rect.height, margin, rect.height - margin));
             return viewport.z > 0f;
+        }
+
+        private Vector2 ProjectDirectionToRectEdge(
+            Rect rect,
+            Vector2 origin,
+            Vector3 worldDirection,
+            float margin)
+        {
+            Vector3 cameraDirection =
+                _utility.camera.transform.InverseTransformDirection(worldDirection);
+            var guiDirection = new Vector2(cameraDirection.x, -cameraDirection.y);
+            if (guiDirection.sqrMagnitude < 0.000001f)
+            {
+                guiDirection = Vector2.up;
+            }
+            guiDirection.Normalize();
+
+            float distance = new Vector2(rect.width, rect.height).magnitude;
+            Vector2 outside = origin + guiDirection * distance;
+            return new Vector2(
+                Mathf.Clamp(outside.x, margin, rect.width - margin),
+                Mathf.Clamp(outside.y, margin, rect.height - margin));
         }
 
         private string Text(string japanese, string english)
