@@ -80,9 +80,19 @@ namespace SabaTools.AvatarMaterials.Editors
         [MenuItem("Tools/SabaTools/Avatar Material Studio")]
         public static void Open()
         {
+            Open(null);
+        }
+
+        public static void Open(GameObject target)
+        {
             AvatarMaterialStudioWindow window = GetWindow<AvatarMaterialStudioWindow>(
                 false, "Avatar Material Studio", true);
             window.minSize = new Vector2(880f, 560f);
+            if (target != null)
+            {
+                window._target = target;
+                window.Refresh();
+            }
             window.Show();
         }
 

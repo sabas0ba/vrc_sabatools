@@ -21,7 +21,7 @@ public static class AvatarMaterialsDemoSetup
         {
             SceneView.lastActiveSceneView.FrameSelected();
         }
-        AvatarMaterialStudioWindow.Open();
+        AvatarMaterialStudioWindow.Open(avatar);
     }
 
     public static void BuildForVerification()
