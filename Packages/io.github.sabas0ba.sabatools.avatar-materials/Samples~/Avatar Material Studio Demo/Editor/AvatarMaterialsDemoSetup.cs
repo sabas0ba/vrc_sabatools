@@ -29,6 +29,13 @@ public static class AvatarMaterialsDemoSetup
         BuildDemo();
     }
 
+    public static void OpenRenderQueueForVerification()
+    {
+        GameObject avatar = BuildDemo();
+        Selection.activeGameObject = avatar;
+        AvatarMaterialStudioWindow.OpenRenderQueue(avatar);
+    }
+
     private static GameObject BuildDemo()
     {
         EnsureFolder();

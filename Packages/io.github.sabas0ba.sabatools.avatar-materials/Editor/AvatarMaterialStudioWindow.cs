@@ -80,10 +80,22 @@ namespace SabaTools.AvatarMaterials.Editors
         [MenuItem("Tools/SabaTools/Avatar Material Studio")]
         public static void Open()
         {
-            Open(null);
+            OpenWindow(null);
         }
 
         public static void Open(GameObject target)
+        {
+            OpenWindow(target);
+        }
+
+        public static void OpenRenderQueue(GameObject target)
+        {
+            AvatarMaterialStudioWindow window = OpenWindow(target);
+            window._workspace = AvatarMaterialWorkspace.RenderQueueAndTransparency;
+            window.Repaint();
+        }
+
+        private static AvatarMaterialStudioWindow OpenWindow(GameObject target)
         {
             AvatarMaterialStudioWindow window = GetWindow<AvatarMaterialStudioWindow>(
                 false, "Avatar Material Studio", true);
@@ -94,6 +106,7 @@ namespace SabaTools.AvatarMaterials.Editors
                 window.Refresh();
             }
             window.Show();
+            return window;
         }
 
         private void OnEnable()
