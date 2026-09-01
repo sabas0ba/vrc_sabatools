@@ -2,6 +2,21 @@
 
 このファイルは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に基づきます。
 
+## [0.2.0] - 2026-09-01
+
+### Added
+
+- 使用手順、全Previewパラメータ、実UI画像を含むGitHub Pages向け使用ガイド
+- Material slot単位のRender Queue範囲比較と半透明World Object Probe
+- Directional／Point Lightの簡易・詳細Gizmo表示
+- 近・中・遠距離および16方向のRenderer Bounds比較と位置関係図
+- Scene View追従を既定とするPreview camera、0.75–2.0のView UI倍率
+
+### Changed
+
+- Packageのdocumentation URLをGitHub Pagesへ変更
+- Render Queueの除外処理をRenderer単位からMaterial slot/submesh単位へ変更
+
 ## [0.1.0] - 2026-08-30
 
 ### Added

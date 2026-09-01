@@ -385,6 +385,12 @@ def discover(repo: str) -> tuple[list[Page], list[dict]]:
         for relative, output, title in candidates:
             source = os.path.join(packages_dir, package_id, relative)
             if os.path.isfile(source):
+                if relative.startswith("Documentation~/"):
+                    with open(source, encoding="utf-8") as handle:
+                        for line in handle:
+                            if line.startswith("# "):
+                                title = line[2:].strip() or title
+                                break
                 pages.append(
                     Page(
                         source=source,

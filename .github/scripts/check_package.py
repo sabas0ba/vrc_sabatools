@@ -27,6 +27,24 @@ package_id = os.path.basename(package.rstrip("/"))
 if manifest.get("name") != package_id:
     problems.append(f"package.json name '{manifest.get('name')}' != folder '{package_id}'")
 
+expected_license = "Apache-2.0"
+if manifest.get("license") != expected_license:
+    problems.append(
+        f"package.json license '{manifest.get('license')}' != '{expected_license}'"
+    )
+
+for license_path in (
+    os.path.join(repo, "LICENSE"),
+    os.path.join(package, "LICENSE.md"),
+):
+    if not os.path.exists(license_path):
+        problems.append(f"missing Apache-2.0 license file: {license_path}")
+        continue
+    with open(license_path, encoding="utf-8") as handle:
+        license_text = handle.read()
+    if "Apache License" not in license_text or "Version 2.0" not in license_text:
+        problems.append(f"{license_path} is not an Apache License 2.0 text")
+
 version = manifest.get("version", "")
 if version and not all(part.isdigit() for part in version.split("-")[0].split(".")):
     problems.append(f"version '{version}' is not numeric dotted form")
