@@ -24,6 +24,13 @@ namespace SabaTools.AvatarMaterials.Editors
         SceneViewFollow,
     }
 
+    internal enum AvatarPreviewGizmoMode
+    {
+        None,
+        Compact,
+        Detailed,
+    }
+
     internal struct AvatarPreviewRenderOptions
     {
         internal AvatarPreviewCameraMode CameraMode;
@@ -44,7 +51,9 @@ namespace SabaTools.AvatarMaterials.Editors
         internal bool DrawViewPoint;
         internal Vector3 ViewPoint;
         internal bool DrawRenderQueueLabels;
+        internal bool DrawQueueFilterStatus;
         internal bool DrawLightingGizmos;
+        internal AvatarPreviewGizmoMode GizmoMode;
     }
 
     internal enum AvatarLightingScenario
@@ -82,11 +91,16 @@ namespace SabaTools.AvatarMaterials.Editors
         private readonly List<Material> _ownedMaterials = new List<Material>();
         private readonly List<LightingGizmoState> _lightingGizmos =
             new List<LightingGizmoState>();
+        private readonly Dictionary<Renderer, Material[]> _queueSourceMaterials =
+            new Dictionary<Renderer, Material[]>();
+        private readonly Dictionary<Renderer, Material[]> _queueFilteredMaterials =
+            new Dictionary<Renderer, Material[]>();
 
         private PreviewRenderUtility _utility;
         private GameObject _instance;
         private GameObject _transparencyProbe;
         private Material _transparencyProbeMaterial;
+        private Material _invisibleQueueMaterial;
         private Bounds _bounds;
         private Vector2 _orbit = new Vector2(-25f, 10f);
         private Vector3 _orbitPan;
@@ -95,6 +109,10 @@ namespace SabaTools.AvatarMaterials.Editors
         private Vector2 _freeLook;
         private bool _freeCameraInitialized;
         private AvatarPreviewCameraMode _lastCameraMode;
+        private RenderQueueVisibilityMode _queueVisibilityMode;
+        private int _queueTotalSlotCount;
+        private int _queueMatchingSlotCount;
+        private int _queueVisibleSlotCount;
 
         internal AvatarMaterialStudioLanguage Language { get; set; }
             = AvatarMaterialStudioLanguage.Japanese;
@@ -159,6 +177,7 @@ namespace SabaTools.AvatarMaterials.Editors
                 }
             }
 
+            CaptureQueueSourceMaterials();
             _bounds = CalculateBounds(_instance);
             _distance = Mathf.Max(_bounds.extents.magnitude * 2.5f, 0.5f);
             ResetCamera();
@@ -194,14 +213,18 @@ namespace SabaTools.AvatarMaterials.Editors
             ConfigureQueueVisibility(options.QueueVisibility, options.QueueRange);
             ConfigureCamera(rect, options);
             ConfigureTransparencyProbe(options);
-            CaptureLightingGizmos(options.DrawLightingGizmos);
+            CaptureLightingGizmos(
+                options.DrawLightingGizmos
+                && options.GizmoMode != AvatarPreviewGizmoMode.None);
 
             _utility.BeginPreview(rect, GUIStyle.none);
             _utility.camera.Render();
             Texture result = _utility.EndPreview();
             GUI.DrawTexture(rect, result, ScaleMode.StretchToFill, false);
             if (options.DrawBounds || options.DrawRenderQueueLabels
-                || options.DrawLightingGizmos)
+                || options.DrawQueueFilterStatus
+                || (options.DrawLightingGizmos
+                    && options.GizmoMode != AvatarPreviewGizmoMode.None))
             {
                 DrawOverlays(rect, options);
             }
@@ -260,6 +283,9 @@ namespace SabaTools.AvatarMaterials.Editors
                 }
             }
             _ownedMaterials.Clear();
+            _invisibleQueueMaterial = null;
+            _queueSourceMaterials.Clear();
+            _queueFilteredMaterials.Clear();
         }
 
         private int ReplaceWithFallbackMaterials(GameObject root)
@@ -533,29 +559,123 @@ namespace SabaTools.AvatarMaterials.Editors
         private void ConfigureQueueVisibility(
             RenderQueueVisibilityMode mode, Vector2Int range)
         {
-            foreach (Renderer renderer in _instance.GetComponentsInChildren<Renderer>(true))
+            _queueVisibilityMode = mode;
+            _queueTotalSlotCount = 0;
+            _queueMatchingSlotCount = 0;
+            _queueVisibleSlotCount = 0;
+
+            foreach (KeyValuePair<Renderer, Material[]> entry in _queueSourceMaterials)
             {
-                if (mode == RenderQueueVisibilityMode.ShowAll)
+                Renderer renderer = entry.Key;
+                Material[] sourceMaterials = entry.Value;
+                if (renderer == null)
                 {
-                    renderer.forceRenderingOff = false;
                     continue;
                 }
 
-                bool inRange = false;
-                foreach (Material material in renderer.sharedMaterials)
+                bool[] visibility = BuildQueueVisibilityMask(sourceMaterials, mode, range);
+                Material[] filteredMaterials = _queueFilteredMaterials[renderer];
+                bool hasVisibleMaterial = false;
+                for (int index = 0; index < sourceMaterials.Length; index++)
                 {
-                    if (material != null
-                        && material.renderQueue >= range.x
-                        && material.renderQueue <= range.y)
+                    Material material = sourceMaterials[index];
+                    if (material == null)
                     {
-                        inRange = true;
-                        break;
+                        filteredMaterials[index] = null;
+                        continue;
+                    }
+
+                    _queueTotalSlotCount++;
+                    if (IsQueueInRange(material, range))
+                    {
+                        _queueMatchingSlotCount++;
+                    }
+                    if (visibility[index])
+                    {
+                        filteredMaterials[index] = material;
+                        _queueVisibleSlotCount++;
+                        hasVisibleMaterial = true;
+                    }
+                    else
+                    {
+                        filteredMaterials[index] = GetInvisibleQueueMaterial();
                     }
                 }
-                renderer.forceRenderingOff = mode == RenderQueueVisibilityMode.OnlySelectedRange
-                    ? !inRange
-                    : inRange;
+
+                renderer.sharedMaterials = filteredMaterials;
+                renderer.forceRenderingOff = !hasVisibleMaterial;
             }
+        }
+
+        private void CaptureQueueSourceMaterials()
+        {
+            _queueSourceMaterials.Clear();
+            _queueFilteredMaterials.Clear();
+            foreach (Renderer renderer in _instance.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] sourceMaterials = renderer.sharedMaterials;
+                _queueSourceMaterials.Add(renderer, sourceMaterials);
+                _queueFilteredMaterials.Add(renderer, new Material[sourceMaterials.Length]);
+            }
+        }
+
+        private Material GetInvisibleQueueMaterial()
+        {
+            if (_invisibleQueueMaterial != null)
+            {
+                return _invisibleQueueMaterial;
+            }
+
+            Shader shader = Shader.Find("Hidden/SabaTools/AvatarMaterialStudio/Invisible");
+            if (shader == null)
+            {
+                return null;
+            }
+            _invisibleQueueMaterial = new Material(shader)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                name = "Render Queue Filter (Invisible)",
+            };
+            _ownedMaterials.Add(_invisibleQueueMaterial);
+            return _invisibleQueueMaterial;
+        }
+
+        internal static bool[] BuildQueueVisibilityMask(
+            Material[] materials, RenderQueueVisibilityMode mode, Vector2Int range)
+        {
+            if (materials == null)
+            {
+                return new bool[0];
+            }
+
+            var result = new bool[materials.Length];
+            for (int index = 0; index < materials.Length; index++)
+            {
+                Material material = materials[index];
+                if (material == null)
+                {
+                    result[index] = false;
+                    continue;
+                }
+                if (mode == RenderQueueVisibilityMode.ShowAll)
+                {
+                    result[index] = true;
+                    continue;
+                }
+
+                bool inRange = IsQueueInRange(material, range);
+                result[index] = mode == RenderQueueVisibilityMode.OnlySelectedRange
+                    ? inRange
+                    : !inRange;
+            }
+            return result;
+        }
+
+        private static bool IsQueueInRange(Material material, Vector2Int range)
+        {
+            return material != null
+                && material.renderQueue >= range.x
+                && material.renderQueue <= range.y;
         }
 
         private void ConfigureCamera(Rect rect, AvatarPreviewRenderOptions options)
@@ -805,13 +925,16 @@ namespace SabaTools.AvatarMaterials.Editors
             {
                 DrawBoundsOverlay(localRect, options);
             }
-            if (options.DrawRenderQueueLabels)
+            if (options.DrawRenderQueueLabels || options.DrawQueueFilterStatus)
             {
-                DrawRenderQueueOverlay(localRect);
+                DrawRenderQueueOverlay(localRect, options);
             }
-            if (options.DrawLightingGizmos)
+            if (options.DrawLightingGizmos
+                && options.GizmoMode != AvatarPreviewGizmoMode.None)
             {
-                DrawLightingOverlay(localRect);
+                DrawLightingOverlay(
+                    localRect,
+                    options.GizmoMode == AvatarPreviewGizmoMode.Detailed);
             }
             GUI.EndGroup();
         }
@@ -852,7 +975,7 @@ namespace SabaTools.AvatarMaterials.Editors
             }
         }
 
-        private void DrawRenderQueueOverlay(Rect rect)
+        private void DrawRenderQueueOverlay(Rect rect, AvatarPreviewRenderOptions options)
         {
             var labelStyle = new GUIStyle(EditorStyles.miniLabel)
             {
@@ -860,8 +983,41 @@ namespace SabaTools.AvatarMaterials.Editors
                 wordWrap = false,
                 clipping = TextClipping.Clip,
             };
-            foreach (Renderer renderer in _instance.GetComponentsInChildren<Renderer>(true))
+
+            if (options.DrawQueueFilterStatus)
             {
+                string status;
+                if (_queueVisibilityMode == RenderQueueVisibilityMode.ShowAll)
+                {
+                    status = Text("基準表示", "Baseline") + "  "
+                        + _queueVisibleSlotCount + "/" + _queueTotalSlotCount
+                        + Text(" slot表示", " slots visible");
+                }
+                else if (_queueMatchingSlotCount == 0)
+                {
+                    status = _queueVisibilityMode == RenderQueueVisibilityMode.OnlySelectedRange
+                        ? Text("対象slotなし", "No matching slots")
+                        : Text("対象slotなし / 基準表示と同一",
+                            "No matching slots / same as baseline");
+                }
+                else
+                {
+                    status = _queueVisibleSlotCount + "/" + _queueTotalSlotCount
+                        + Text(" slot表示 / 対象 ", " slots visible / matched ")
+                        + _queueMatchingSlotCount;
+                }
+                DrawOverlayLabel(rect, new Vector2(4f, 4f), status, labelStyle, 260f);
+            }
+
+            if (!options.DrawRenderQueueLabels
+                || options.GizmoMode != AvatarPreviewGizmoMode.Detailed)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<Renderer, Material[]> entry in _queueSourceMaterials)
+            {
+                Renderer renderer = entry.Key;
                 if (!(renderer is MeshRenderer) && !(renderer is SkinnedMeshRenderer))
                 {
                     continue;
@@ -869,13 +1025,16 @@ namespace SabaTools.AvatarMaterials.Editors
 
                 var queues = new List<string>();
                 int representativeQueue = 2000;
-                foreach (Material material in renderer.sharedMaterials)
+                foreach (Material material in entry.Value)
                 {
                     if (material == null)
                     {
                         continue;
                     }
-                    representativeQueue = material.renderQueue;
+                    if (queues.Count == 0)
+                    {
+                        representativeQueue = material.renderQueue;
+                    }
                     queues.Add(material.renderQueue + " " + QueueCategory(material.renderQueue));
                 }
                 if (queues.Count == 0)
@@ -899,13 +1058,14 @@ namespace SabaTools.AvatarMaterials.Editors
             }
         }
 
-        private void DrawLightingOverlay(Rect rect)
+        private void DrawLightingOverlay(Rect rect, bool detailed)
         {
             var labelStyle = new GUIStyle(EditorStyles.miniBoldLabel)
             {
                 normal = { textColor = Color.white },
                 clipping = TextClipping.Clip,
             };
+            bool showLabels = detailed || rect.Contains(Event.current.mousePosition);
             foreach (LightingGizmoState light in _lightingGizmos)
             {
                 Handles.color = new Color(light.Color.r, light.Color.g, light.Color.b, 1f);
@@ -926,14 +1086,17 @@ namespace SabaTools.AvatarMaterials.Editors
                     }
                     DrawArrow(lightPosition, targetPosition, 2f, true);
                     Handles.DrawWireDisc(lightPosition, Vector3.forward, 7f);
-                    DrawOverlayLabel(
-                        rect,
-                        lightPosition + new Vector2(8f, -8f),
-                        Text("Point光源 → Avatar", "Point source → avatar") + "  "
-                        + light.Intensity.ToString("0.00") + "\ndir "
-                        + FormatDirection(light.Direction),
-                        labelStyle,
-                        230f);
+                    if (showLabels)
+                    {
+                        DrawOverlayLabel(
+                            rect,
+                            lightPosition + new Vector2(8f, -8f),
+                            Text("Point光源 → Avatar", "Point source → avatar") + "  "
+                            + light.Intensity.ToString("0.00") + "\ndir "
+                            + FormatDirection(light.Direction),
+                            labelStyle,
+                            230f);
+                    }
                 }
                 else if (light.Type == LightType.Directional)
                 {
@@ -946,14 +1109,17 @@ namespace SabaTools.AvatarMaterials.Editors
                         continue;
                     }
                     DrawArrow(start, end, 3f, false);
-                    DrawOverlayLabel(
-                        rect,
-                        start + new Vector2(4f, -4f),
-                        Text("Directional光線", "Directional ray") + "  "
-                        + light.Intensity.ToString("0.00") + "\ndir "
-                        + FormatDirection(light.Direction),
-                        labelStyle,
-                        230f);
+                    if (showLabels)
+                    {
+                        DrawOverlayLabel(
+                            rect,
+                            start + new Vector2(4f, -4f),
+                            Text("Directional光線", "Directional ray") + "  "
+                            + light.Intensity.ToString("0.00") + "\ndir "
+                            + FormatDirection(light.Direction),
+                            labelStyle,
+                            230f);
+                    }
                 }
             }
         }

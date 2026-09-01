@@ -135,6 +135,16 @@ public static class AvatarMaterialsDemoSetup
             SetColor(material, "_RimColor", new Color(0.2f, 0.9f, 1.5f));
             SetFloat(material, "_RimBorder", 0.4f);
         });
+        Material queueBackgroundMaterial = CreateQueueDemoMaterial(
+            "QueueBackground", 1000, "Opaque", new Color(0.25f, 0.45f, 1f));
+        Material queueGeometryMaterial = CreateQueueDemoMaterial(
+            "QueueGeometry", 2000, "Opaque", new Color(0.25f, 1f, 0.45f));
+        Material queueAlphaTestMaterial = CreateQueueDemoMaterial(
+            "QueueAlphaTest", 2450, "TransparentCutout", new Color(1f, 0.85f, 0.1f));
+        Material queueGeometryLastMaterial = CreateQueueDemoMaterial(
+            "QueueGeometryLast", 2500, "Opaque", new Color(1f, 0.45f, 0.1f));
+        Material queueOverlayMaterial = CreateQueueDemoMaterial(
+            "QueueOverlay", 4000, "Transparent", new Color(0.85f, 0.25f, 1f));
 
         CreatePart("Torso", PrimitiveType.Capsule, avatar.transform,
             new Vector3(0f, 1.12f, 0f), new Vector3(0.38f, 0.43f, 0.25f),
@@ -184,6 +194,14 @@ public static class AvatarMaterialsDemoSetup
         CreatePart("TransparentJacket", PrimitiveType.Cube, avatar.transform,
             new Vector3(0f, 1.13f, 0f), new Vector3(0.44f, 0.43f, 0.3f),
             Vector3.zero, garmentMaterial);
+        CreateMixedQueueSlotStrip(
+            avatar.transform,
+            queueBackgroundMaterial,
+            queueGeometryMaterial,
+            queueAlphaTestMaterial,
+            queueGeometryLastMaterial,
+            garmentMaterial,
+            queueOverlayMaterial);
         CreatePart("ShoulderAccessory", PrimitiveType.Cube, avatar.transform,
             new Vector3(0.49f, 1.36f, 0f), new Vector3(0.16f, 0.1f, 0.22f),
             new Vector3(0f, 0f, -12f), accentMaterial);
@@ -215,6 +233,79 @@ public static class AvatarMaterialsDemoSetup
             UnityEngine.Object.DestroyImmediate(collider);
         }
         return part;
+    }
+
+    private static Material CreateQueueDemoMaterial(
+        string name, int queue, string renderType, Color color)
+    {
+        return CreateMaterial(name, "lilToon", material =>
+        {
+            material.SetOverrideTag("VRCFallback", "ToonStandard");
+            material.SetOverrideTag("RenderType", renderType);
+            material.renderQueue = queue;
+            SetColor(material, "_Color", color);
+            SetFloat(material, "_Cull", 0f);
+            SetFloat(material, "_LightMinLimit", 0.2f);
+            SetFloat(material, "_LightMaxLimit", 2f);
+        });
+    }
+
+    private static void CreateMixedQueueSlotStrip(
+        Transform parent, params Material[] materials)
+    {
+        var part = new GameObject("MixedQueueGarment");
+        part.transform.SetParent(parent);
+        part.transform.localPosition = new Vector3(0f, 1.2f, -0.34f);
+
+        var filter = part.AddComponent<MeshFilter>();
+        var renderer = part.AddComponent<MeshRenderer>();
+        const string meshPath = DemoFolder + "/MixedQueueGarment.asset";
+        Mesh mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+        if (mesh == null)
+        {
+            mesh = new Mesh { name = "MixedQueueGarment" };
+            AssetDatabase.CreateAsset(mesh, meshPath);
+        }
+        else
+        {
+            mesh.Clear();
+        }
+
+        const float width = 0.105f;
+        const float height = 0.14f;
+        const float gap = 0.012f;
+        float totalWidth = materials.Length * width + (materials.Length - 1) * gap;
+        var vertices = new Vector3[materials.Length * 4];
+        var uv = new Vector2[vertices.Length];
+        mesh.subMeshCount = materials.Length;
+        for (int slot = 0; slot < materials.Length; slot++)
+        {
+            float left = -totalWidth * 0.5f + slot * (width + gap);
+            float right = left + width;
+            int vertex = slot * 4;
+            vertices[vertex] = new Vector3(left, -height * 0.5f, 0f);
+            vertices[vertex + 1] = new Vector3(right, -height * 0.5f, 0f);
+            vertices[vertex + 2] = new Vector3(right, height * 0.5f, 0f);
+            vertices[vertex + 3] = new Vector3(left, height * 0.5f, 0f);
+            uv[vertex] = Vector2.zero;
+            uv[vertex + 1] = Vector2.right;
+            uv[vertex + 2] = Vector2.one;
+            uv[vertex + 3] = Vector2.up;
+        }
+        mesh.vertices = vertices;
+        mesh.uv = uv;
+        for (int slot = 0; slot < materials.Length; slot++)
+        {
+            int vertex = slot * 4;
+            mesh.SetTriangles(
+                new[] { vertex, vertex + 2, vertex + 1, vertex, vertex + 3, vertex + 2 },
+                slot);
+        }
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        EditorUtility.SetDirty(mesh);
+        filter.sharedMesh = mesh;
+        renderer.sharedMaterials = materials;
     }
 
     private static Material CreateMaterial(string name, string shaderName, Action<Material> configure)

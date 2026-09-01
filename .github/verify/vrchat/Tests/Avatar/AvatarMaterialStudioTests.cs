@@ -158,11 +158,44 @@ namespace SabaTools.Inspect.Avatar.SdkTests
                 AvatarPreviewCameraMode.SceneViewFollow,
                 AvatarMaterialStudioWindow.DefaultCameraMode);
             Assert.AreEqual(
+                AvatarPreviewGizmoMode.Compact,
+                AvatarMaterialStudioWindow.DefaultGizmoMode);
+            Assert.AreEqual(
                 135f, AvatarMaterialStudioWindow.ScalePreviewDimension(180f, 0.5f));
             Assert.AreEqual(
                 180f, AvatarMaterialStudioWindow.ScalePreviewDimension(180f, 1f));
             Assert.AreEqual(
                 360f, AvatarMaterialStudioWindow.ScalePreviewDimension(180f, 3f));
+        }
+
+        [Test]
+        public void RenderQueueVisibilityMaskFiltersIndividualMaterialSlots()
+        {
+            Shader shader = Shader.Find("Standard");
+            Material background = CreateMaterial(shader, "Background");
+            Material geometry = CreateMaterial(shader, "Geometry");
+            Material alphaTest = CreateMaterial(shader, "AlphaTest");
+            Material transparent = CreateMaterial(shader, "Transparent");
+            background.renderQueue = 1000;
+            geometry.renderQueue = 2000;
+            alphaTest.renderQueue = 2450;
+            transparent.renderQueue = 3000;
+            Material[] slots = { background, geometry, alphaTest, transparent };
+
+            CollectionAssert.AreEqual(
+                new[] { false, true, false, false },
+                AvatarMaterialPreview.BuildQueueVisibilityMask(
+                    slots,
+                    RenderQueueVisibilityMode.OnlySelectedRange,
+                    AvatarRenderDiagnostics.ResolveQueueRange(
+                        RenderQueueRangePreset.Geometry, 0, 5000)));
+            CollectionAssert.AreEqual(
+                new[] { true, true, false, true },
+                AvatarMaterialPreview.BuildQueueVisibilityMask(
+                    slots,
+                    RenderQueueVisibilityMode.ExcludeSelectedRange,
+                    AvatarRenderDiagnostics.ResolveQueueRange(
+                        RenderQueueRangePreset.AlphaTest, 0, 5000)));
         }
 
         [Test]

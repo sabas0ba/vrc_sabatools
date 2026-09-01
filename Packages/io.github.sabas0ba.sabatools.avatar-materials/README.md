@@ -14,10 +14,11 @@
 - 異なる Texture Asset のソースファイル内容を SHA-256 で比較し、同一画像の重複配置を検出
 - Material がアバター内の何 slot から共有されているかを表示
 - Original／Fallback／Quest のモード選択と、17 種類の照明環境の並列グリッド表示
-- 無照明、環境光の下限／上限、Directional Light の強度／色／複数灯、逆光、Point Light の距離／方向／複数灯、混合光を比較し、Light の位置と方向を Gizmo 表示
+- 無照明、環境光の下限／上限、Directional Light の強度／色／複数灯、逆光、Point Light の距離／方向／複数灯、混合光を比較し、Light の位置と方向をGizmo表示
 - Orbit、Free Fly、Scene View FollowのPreview camera
 - Mesh／MaterialごとのRender Queue、RenderType、ZWrite／ZTest／Cull／Blend、sorting設定の一覧と矛盾検出
-- 標準 Queue 範囲ごとに全表示／範囲内のみ／範囲外のみを並べ、各ObjectのBounds、名前、Queue番号、区分を重ねて表示
+- 基準表示と、標準Queue範囲ごとの該当Material slotのみ／該当slotを除外した表示を比較
+- Gizmo表示をなし／簡易／詳細から選択し、詳細時にObjectのBounds、名前、Queue番号、区分を重ねて表示
 - Mesh／Material設定一覧の折りたたみと左右ペイン幅のドラッグ調整
 - 手前の半透明world-object probeを2501／3000／3100／4000で並列比較
 - MeshRenderer／SkinnedMeshRendererのlocal／world bounds表示とwireframe overlay

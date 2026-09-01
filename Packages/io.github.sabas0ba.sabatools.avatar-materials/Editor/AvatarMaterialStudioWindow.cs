@@ -23,6 +23,8 @@ namespace SabaTools.AvatarMaterials.Editors
     {
         internal const AvatarPreviewCameraMode DefaultCameraMode =
             AvatarPreviewCameraMode.SceneViewFollow;
+        internal const AvatarPreviewGizmoMode DefaultGizmoMode =
+            AvatarPreviewGizmoMode.Compact;
         internal const float MinimumPreviewUiScale = 0.75f;
         internal const float MaximumPreviewUiScale = 2f;
 
@@ -53,6 +55,8 @@ namespace SabaTools.AvatarMaterials.Editors
         private AvatarPreviewMode _previewMode;
         [SerializeField]
         private AvatarPreviewCameraMode _cameraMode = DefaultCameraMode;
+        [SerializeField]
+        private AvatarPreviewGizmoMode _gizmoMode = DefaultGizmoMode;
         [SerializeField]
         private float _previewUiScale = 1f;
         private float _transparencyProbeAlpha = 0.35f;
@@ -597,7 +601,19 @@ namespace SabaTools.AvatarMaterials.Editors
                             "Follows the last active Scene view camera")
                         : T("左ドラッグ: 回転 / 中ドラッグ: 平行移動 / Wheel: Zoom",
                             "LMB: orbit / MMB: pan / Wheel: zoom");
-                EditorGUILayout.LabelField(help, EditorStyles.miniLabel);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    _gizmoMode = (AvatarPreviewGizmoMode)EditorGUILayout.Popup(
+                        T("Gizmo表示", "Gizmos"), (int)_gizmoMode,
+                        new[]
+                        {
+                            T("なし", "None"),
+                            T("簡易", "Compact"),
+                            T("詳細", "Detailed"),
+                        },
+                        GUILayout.MaxWidth(250f));
+                    EditorGUILayout.LabelField(help, EditorStyles.miniLabel);
+                }
             }
         }
 
@@ -615,6 +631,7 @@ namespace SabaTools.AvatarMaterials.Editors
                 QueueVisibility = RenderQueueVisibilityMode.ShowAll,
                 QueueRange = new Vector2Int(0, 5000),
                 DrawLightingGizmos = true,
+                GizmoMode = _gizmoMode,
             };
         }
 
@@ -677,12 +694,24 @@ namespace SabaTools.AvatarMaterials.Editors
         private void DrawQueueVisibilityMatrix()
         {
             EditorGUILayout.LabelField(
-                T("Mesh表示 / Queue範囲 比較", "Mesh Visibility / Queue Range Comparison"),
+                T("Material slot表示 / Queue範囲 比較",
+                    "Material Slot Visibility / Queue Range Comparison"),
                 EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
-                T("各行はQueue範囲、各列は表示条件です。Preview Cloneだけに適用され、各Objectの所属をBoundsとTextで表示します。",
-                    "Rows are queue ranges and columns are visibility modes. Filters affect only the preview clone; bounds and text show each object's membership."),
+                T("基準表示と、各Queueに該当するslotのみ／該当slotを除外した結果を比較します。変更はPreview Cloneだけに適用されます。",
+                    "Compare the baseline with slots inside each queue range and with those slots excluded. Changes affect only the preview clone."),
                 EditorStyles.wordWrappedMiniLabel);
+
+            EditorGUILayout.LabelField(T("基準表示", "Baseline"), EditorStyles.miniBoldLabel);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                DrawQueuePreviewCard(
+                    T("全slot", "All Slots"),
+                    RenderQueueVisibilityMode.ShowAll,
+                    new Vector2Int(0, 5000));
+                GUILayout.FlexibleSpace();
+            }
+            EditorGUILayout.Space(6f);
 
             RenderQueueRangePreset[] presets =
             {
@@ -695,7 +724,6 @@ namespace SabaTools.AvatarMaterials.Editors
             };
             RenderQueueVisibilityMode[] modes =
             {
-                RenderQueueVisibilityMode.ShowAll,
                 RenderQueueVisibilityMode.OnlySelectedRange,
                 RenderQueueVisibilityMode.ExcludeSelectedRange,
             };
@@ -709,29 +737,36 @@ namespace SabaTools.AvatarMaterials.Editors
                 {
                     foreach (RenderQueueVisibilityMode mode in modes)
                     {
-                        using (new EditorGUILayout.VerticalScope(
-                                   EditorStyles.helpBox,
-                                   GUILayout.MinWidth(ScalePreviewDimension(
-                                       180f, _previewUiScale) + 12f)))
-                        {
-                            EditorGUILayout.LabelField(QueueVisibilityName(mode),
-                                EditorStyles.boldLabel);
-                            Rect previewRect = GUILayoutUtility.GetRect(
-                                ScalePreviewDimension(180f, _previewUiScale),
-                                ScalePreviewDimension(162f, _previewUiScale),
-                                GUILayout.ExpandWidth(true));
-                            _preview.Draw(previewRect,
-                                AvatarLightingScenario.DirectionalNeutral,
-                                new AvatarPreviewRenderOptions
-                                {
-                                    CameraMode = _cameraMode,
-                                    QueueVisibility = mode,
-                                    QueueRange = range,
-                                    DrawRenderQueueLabels = true,
-                                });
-                        }
+                        DrawQueuePreviewCard(QueueVisibilityName(mode), mode, range);
                     }
                 }
+            }
+        }
+
+        private void DrawQueuePreviewCard(
+            string title, RenderQueueVisibilityMode mode, Vector2Int range)
+        {
+            using (new EditorGUILayout.VerticalScope(
+                       EditorStyles.helpBox,
+                       GUILayout.MinWidth(ScalePreviewDimension(
+                           220f, _previewUiScale) + 12f)))
+            {
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                Rect previewRect = GUILayoutUtility.GetRect(
+                    ScalePreviewDimension(220f, _previewUiScale),
+                    ScalePreviewDimension(176f, _previewUiScale),
+                    GUILayout.ExpandWidth(true));
+                _preview.Draw(previewRect,
+                    AvatarLightingScenario.DirectionalNeutral,
+                    new AvatarPreviewRenderOptions
+                    {
+                        CameraMode = _cameraMode,
+                        QueueVisibility = mode,
+                        QueueRange = range,
+                        DrawRenderQueueLabels = true,
+                        DrawQueueFilterStatus = true,
+                        GizmoMode = _gizmoMode,
+                    });
             }
         }
 
@@ -861,7 +896,8 @@ namespace SabaTools.AvatarMaterials.Editors
                 TransparencyProbeAlpha = _transparencyProbeAlpha,
                 TransparencyProbeZWrite = _transparencyProbeZWrite,
                 TransparencyProbeDistance = _transparencyProbeDistance,
-                DrawRenderQueueLabels = true,
+                DrawRenderQueueLabels = _gizmoMode == AvatarPreviewGizmoMode.Detailed,
+                GizmoMode = _gizmoMode,
             };
         }
 

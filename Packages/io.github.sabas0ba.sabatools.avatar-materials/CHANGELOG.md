@@ -18,8 +18,9 @@
 - VRChat shader fallback の近似 preview
 - Android Per-Platform Override と Quest mobile shader の preview
 - 日本語／英語UI切替（日本語既定）と調整可能・折りたたみ可能な左右ペイン
-- 標準Render Queue範囲とMesh表示条件の並列比較、Object名／Queue区分のGizmo・Text overlay
+- 標準Render Queue範囲をMaterial slot単位で除外する並列比較、Object名／Queue区分のGizmo・Text overlay
 - Near／Middle／Far固定ProbeとユーザーCameraの並列Bounds Preview、上面／側面のCamera位置関係図
 - TextureソースファイルのSHA-256比較による重複Asset検出
 - Directional／Point Lightの位置・方向Gizmo
+- Gizmoのなし／簡易／詳細表示切替と、Lighting数値ラベルのhover表示
 - 同一PNGを別Asset pathから参照するTexture重複検出用Sample
