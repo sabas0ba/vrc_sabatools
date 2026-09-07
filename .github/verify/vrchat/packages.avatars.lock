@@ -1,4 +1,4 @@
-# Pinned VRChat SDK packages for the Avatars verification project.
+# Pinned VPM packages for the Avatars verification project.
 #
 # Fields: <package id> <version> <sha256 of the zip> <download url>
 #
@@ -9,3 +9,4 @@
 
 com.vrchat.base    3.10.4 86e8187a7d8f5fb5a54d442b64d09899be2fab2ef1b7822a3c202549ff05ff6b https://github.com/vrchat/packages/releases/download/3.10.4/com.vrchat.base-3.10.4.zip
 com.vrchat.avatars 3.10.4 6cb00b0c23cfac2bff244b641142763d158875ff85cc3f64e9ea76464677c7bf https://github.com/vrchat/packages/releases/download/3.10.4/com.vrchat.avatars-3.10.4.zip
+jp.lilxyzw.liltoon 2.3.4 34d172761c51aa9469a904704109086aafa6125a4fa0e058766e2ddc73d3b303 https://github.com/lilxyzw/lilToon/releases/download/2.3.4/jp.lilxyzw.liltoon-2.3.4.zip

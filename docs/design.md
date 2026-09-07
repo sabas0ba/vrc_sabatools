@@ -1,4 +1,4 @@
-# SabaTools Inspect 設計
+# SabaTools 設計
 
 ## 目的
 
@@ -9,16 +9,52 @@ SabaTools Inspectは、Unity Editor上のアバターまたはワールドを読
 自動修復、一括設定、最適化処理はこのツールへ追加しません。書き込みを伴う機能が必要に
 なった場合は、検査結果と操作の境界が利用者から明確に見える別パッケージとして設計します。
 
+Avatar Material Studioはこの境界に従う書き込み可能なEditor拡張です。Inspectの走査処理や
+assemblyを参照せず、変更は利用者がMaterial slotまたはTexture propertyを操作した時だけ
+Unity Undoを記録して実行します。Previewは非保存のPreview Scene上の複製だけを変更します。
+
 ## パッケージ境界
 
 | パッケージ | 依存 | 役割 |
 | --- | --- | --- |
 | `io.github.sabas0ba.sabatools.core` | なし | Scene走査、共通統計、参照検査、レポート、EditorWindow、拡張点 |
 | `io.github.sabas0ba.sabatools.avatar` | core、Avatars SDK | `VRCAvatarDescriptor`とAvatar固有Assetの検査 |
+| `io.github.sabas0ba.sabatools.avatar-materials` | Avatars SDK、lilToon | Material／Texture編集、照明／Fallback／Quest preview |
 | `io.github.sabas0ba.sabatools.world` | core、Worlds SDK | `VRCSceneDescriptor`とWorld固有Componentの検査 |
 
 依存方向はavatarからcore、worldからcoreへの一方向です。coreはSDK assemblyや両モジュールを
 参照しません。Avatars SDKとWorlds SDKを同じProjectへ導入する前提も置きません。
+avatar-materialsは書き込み可能性の境界として独立し、coreやInspectionModuleへ依存しません。
+
+## Material編集と表示比較
+
+Avatar Material Studioは対象root以下の全Rendererを読み、Material slotをHierarchy path順に
+表示します。MaterialのTexture propertyはShader APIから列挙するため、shader固有のproperty名を
+固定していません。slot変更はRenderer、Texture／Tiling／Offset変更はMaterialへUndoを記録し、
+Prefab instance override、Scene dirty、Asset dirtyをそれぞれ明示します。
+
+使用中TextureはAvatar全体で一意に集約し、各TextureからMaterial propertyとRenderer slot数を
+逆引きします。異なるAsset pathのソースファイルはSHA-256で比較し、同一内容の重複を示します。
+表示比較はOriginal／Fallback／Questのみを選択式とし、無照明、環境光上下限、Directional／Pointの
+強度・色・距離・方向・複数灯を17セルのグリッドへ並列表示し、Lightの位置と方向を重ねます。
+
+Preview cameraはOrbit、Free Fly、最後にactiveだったScene View cameraへの追従を選べます。
+Render Queue診断はMaterialのqueue／RenderType／depth／blendとRendererのsubmesh／sortingを一覧化し、
+標準Queue範囲ごとに全表示／範囲内のみ／範囲外のみを並列表示します。各RendererのBounds、名前、
+Queue番号と区分をPreviewに重ねます。半透明world-object probeは複数queueで並列表示し、透明衣装との
+depth／sorting事故を目視比較します。
+
+Bounds診断はMeshRendererとSkinnedMeshRendererのlocal／world AABBを表示し、ViewPositionを中心に
+近・中・遠の3距離×16方向でcamera frustumとの交差を検査します。選択方向では3つの固定Probeと
+独立したユーザー操作Cameraを同時表示し、ViewPositionとの位置関係を上面／側面図で示します。
+AABB frustum検査は保守的でfalse positiveを含み得るため、固定Probe Previewへbounds wireframeを
+重ねて確認します。ユーザーCameraを動かしても固定Probeの判定値は変更しません。
+
+表示比較は元objectをPreview Sceneへ複製して行います。FallbackはVRChat公式文書の
+`VRCFallback` tagと旧shader名heuristicを再現した近似です。QuestはAndroid Per-Platform Overrideを
+優先し、無い場合に限り許可済みMobile shaderの判定とproperty名ベースの近似変換を行います。
+VRChat client内部のshader replacement、Android build、textureのplatform import overrideは再現せず、
+SDK validationと実機Build & Testを最終確認とします。
 
 ## 検査の流れ
 
@@ -68,12 +104,12 @@ UIの`Ping`は検査時に収集した位置情報から対象をEditor上で強
 
 | 階層 | 対象 | 現在の件数 |
 | --- | --- | ---: |
-| .NET 8 | 全packageの`Editor/Core` | 25 |
+| .NET 8 | 全packageの`Editor/Core` | 28 |
 | Unity EditMode | coreの収集器と公開API | 18 |
-| Unity + Avatars SDK | Avatar module | 17 |
+| Unity + Avatars SDK | Avatar module、Avatar Material Studio | 26 |
 | Unity + Worlds SDK | World module | 15 |
 
-合計75件です。これにRoslyn compile、documentation render、internal link、manifest、`.meta`、
+合計87件です。これにRoslyn compile、documentation render、internal link、manifest、`.meta`、
 dependency purityの検査を加えます。
 
 CIでUnity licenceが利用可能な場合のみ、Unity workflowはUnity回帰試験を実行します。
@@ -89,9 +125,11 @@ gateとします。この場合のUnity workflowの成功表示はUnity試験の
 - PhysBoneの影響Transform数は近似です。
 - Worldの床面はRenderer boundsで推定するため、巨大な装飾Meshで誤検出しえます。
 - EditModeだけを対象とし、ClientSim、PlayMode、VRChatへのBuild／Uploadは行いません。
+- Fallback previewは公開規則による近似で、VRChat client内の置換処理そのものではありません。
+- Quest近似previewはAndroid buildとplatform別Texture import settingsを再現しません。
 
 ## リリース方針
 
 packageごとに`<package-id>/v<version>`形式のtagを使用します。初版はpull requestのreviewと
-merge後に`0.1.0`としてtagを作成します。coreを先にlistingへ公開し、そのdependencyが解決
-可能になってからavatarとworldを公開します。
+merge後に`0.1.0`としてtagを作成します。依存するsibling packageがある場合は、先にそのversionが
+listingで解決可能であることを確認してから公開します。

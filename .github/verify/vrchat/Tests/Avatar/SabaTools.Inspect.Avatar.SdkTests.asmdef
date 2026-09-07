@@ -4,6 +4,7 @@
     "references": [
         "SabaTools.Inspect.Core.Editor",
         "SabaTools.Inspect.Avatar.Editor",
+        "SabaTools.Avatar.Materials.Editor",
         "VRC.SDK3A",
         "VRC.SDKBase",
         "UnityEngine.TestRunner",

@@ -112,7 +112,7 @@ jobs:
   #
   # A separate job per lane, and a separate project per lane: com.vrchat.avatars
   # and com.vrchat.worlds are not meant to share a project, which is the reason
-  # sabatools.avatar and sabatools.world are separate packages. The SDK is
+  # The avatar tool packages and sabatools.world are separated by SDK lane. The SDK is
   # fetched by URL and SHA256 from .github/verify/vrchat/packages.<lane>.lock.
   sdk:
     name: VRChat SDK regression tests (${{ matrix.lane }})

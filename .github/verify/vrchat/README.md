@@ -1,13 +1,13 @@
 # VRChat SDK 検証プロジェクト
 
-`sabatools.avatar` と `sabatools.world` は VRChat SDK の型を直接参照します。SDK のアセンブリは再配布できず NuGet にも無いため、`.github/verify/verify.sh` はこの 2 パッケージの `Editor/Core` (Unity 非依存の計算部分) しか検証できません。
+`sabatools.avatar`、`sabatools.avatar-materials`、`sabatools.world` は VRChat SDK の型を直接参照します。SDK のアセンブリは再配布できず NuGet にも無いため、`.github/verify/verify.sh` はこれらの `Editor/Core` (Unity 非依存の計算部分) しか検証できません。
 
 ここにあるのは、残りを実際の SDK と Unity で検証するための組み立て手順です。
 
 ## 方針
 
 - **レーンを分ける**: `avatars` と `worlds` は別プロジェクトとして組みます。`com.vrchat.avatars` と `com.vrchat.worlds` は同一プロジェクトでの併用が想定されておらず、それこそがパッケージを分けた理由です。両方入れたプロジェクトで検証しても、利用者に存在しない構成を確かめたことにしかなりません
-- **SDK は hash で固定**: `packages.<lane>.lock` に URL と SHA256 で固定します。ローカルの VCC / ALCOM のキャッシュには依存しません
+- **VPM依存は hash で固定**: SDKとlilToonを`packages.<lane>.lock`のURLとSHA256で固定します。ローカルのVCC / ALCOMのキャッシュには依存しません
 - **取得はコンテナ内**: digest で固定した alpine イメージの busybox (`wget` / `unzip` / `sha256sum`) だけを使い、コンテナ内でのパッケージ導入も行いません
 - **Unity はホストのもの**: Unity をコンテナで動かすにはライセンスが必要で、それは `.github/workflows/unity.yml` と同じ制約です
 
@@ -29,7 +29,7 @@ Unity は Unity Hub の既定の場所から `ProjectVersion.txt` に一致す�
 
 初回は SDK が要求する UPM パッケージ (burst、collections 等) を Unity がレジストリから取得するため、数分かかります。
 
-## SDK の固定
+## VPM依存の固定
 
 両レーンの URL と SHA256 は `packages.<lane>.lock` に記録済みです。空または形式不正の
 ハッシュは `fetch.sh` が取得前に失敗させます。
@@ -50,4 +50,4 @@ Unity は Unity Hub の既定の場所から `ProjectVersion.txt` に一致す�
 
 `packages.<lane>.lock` の該当行のバージョン・SHA256・URL を公式リスティングの値に差し替えて `fetch.sh` を再実行してください。ハッシュが合わない場合は取得を失敗させます。
 
-パッケージ側の `vpmDependencies` は下限 (`>=3.10.4`) のみを宣言しています。VPM は範囲指定しか書けず、厳密に固定すると利用者の SDK 更新を壊すためです。厳密な固定はこの lock ファイルが担い、配布物とは役割を分けています。
+パッケージ側の`vpmDependencies`は下限（SDKは`>=3.10.4`、lilToonは`>=2.3.4`）のみを宣言しています。VPMは範囲指定しか書けず、厳密に固定すると利用者の更新を壊すためです。厳密な固定はこのlock fileが担い、配布物とは役割を分けています。

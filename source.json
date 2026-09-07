@@ -13,6 +13,7 @@
   "packages": [
     "io.github.sabas0ba.sabatools.core",
     "io.github.sabas0ba.sabatools.avatar",
+    "io.github.sabas0ba.sabatools.avatar-materials",
     "io.github.sabas0ba.sabatools.world"
   ]
 }

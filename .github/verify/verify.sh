@@ -17,8 +17,9 @@
 # What this does NOT prove:
 #   * UnityEditor API signatures. UnityEditor.dll is not redistributable, so
 #     `UnityEditorStub.cs` stands in for it and is written by hand.
-#   * anything in sabatools.avatar or sabatools.world that touches the VRChat
-#     SDK. The SDK's assemblies are not redistributable and are not on NuGet,
+#   * anything in sabatools.avatar, sabatools.avatar-materials or
+#     sabatools.world that touches the VRChat SDK. The SDK's assemblies are not
+#     redistributable and are not on NuGet,
 #     and a hand-written SDK stub would assert signatures rather than check
 #     them. Those assemblies are compiled and run against the real SDK by
 #     .github/verify/vrchat/ instead; only their Editor/Core is covered here.
@@ -123,8 +124,9 @@ echo "ok"
 log "Compiling the core Editor assembly (real UnityEngine references + stub)"
 # ---------------------------------------------------------------------------
 # The packages are Editor-only, so there is no Runtime assembly to build.
-# Only core is compiled here: sabatools.avatar and sabatools.world reference
-# the VRChat SDK, which cannot be obtained the way UnityEngine can.
+# Only core is compiled here: the other Editor assemblies reference a VRChat
+# SDK or are exercised in the matching SDK lane, which cannot be obtained the
+# way UnityEngine can.
 mapfile -t EDITOR_SOURCES < <(find "$CORE_PACKAGE/Editor" -name '*.cs' | sort)
 [ "${#EDITOR_SOURCES[@]}" -gt 0 ] || fail "no Editor sources found under $CORE_PACKAGE"
 

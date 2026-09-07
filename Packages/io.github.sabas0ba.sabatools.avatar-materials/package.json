@@ -1,0 +1,37 @@
+{
+  "name": "io.github.sabas0ba.sabatools.avatar-materials",
+  "displayName": "SabaTools Avatar Material Studio",
+  "version": "0.2.0",
+  "unity": "2022.3",
+  "description": "VRChatアバターのMaterial、Texture、照明、Render Queue、Renderer Boundsを一覧・比較し、衣装の消失や表示差をアップロード前に調査します。",
+  "author": {
+    "name": "sabas0ba",
+    "url": "https://github.com/sabas0ba"
+  },
+  "license": "Apache-2.0",
+  "licensesUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/LICENSE",
+  "documentationUrl": "https://sabas0ba.github.io/vrc_sabatools/docs/io.github.sabas0ba.sabatools.avatar-materials/index.html",
+  "changelogUrl": "https://sabas0ba.github.io/vrc_sabatools/docs/io.github.sabas0ba.sabatools.avatar-materials/changelog.html",
+  "vpmDependencies": {
+    "com.vrchat.avatars": ">=3.10.4",
+    "jp.lilxyzw.liltoon": ">=2.3.4"
+  },
+  "samples": [
+    {
+      "displayName": "lilToon Avatar Material Demo",
+      "description": "Shadow, emission, MatCap, rim light, outline, transparency and six texture assets for visualization and inventory verification.",
+      "path": "Samples~/Avatar Material Studio Demo"
+    }
+  ],
+  "keywords": [
+    "vrchat",
+    "avatar",
+    "material",
+    "texture",
+    "quest",
+    "fallback",
+    "liltoon",
+    "preview",
+    "editor"
+  ]
+}

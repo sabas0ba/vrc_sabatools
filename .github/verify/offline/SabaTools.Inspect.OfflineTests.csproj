@@ -11,7 +11,7 @@
   <!--
     Editor/Core is intentionally Unity-independent. Linking the production
     sources here makes this executable a direct regression test of the code
-    shipped in all three packages, without copying it or adding a test SDK.
+    shipped in every package, without copying it or adding a test SDK.
   -->
   <ItemGroup>
     <Compile Include="../../../Packages/*/Editor/Core/**/*.cs"

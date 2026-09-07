@@ -22,6 +22,8 @@ VRChat SDK に依存しないため、アバター用・ワールド用どちら
 
 両方を入れる必要はありません。VRChat の Avatars SDK と Worlds SDK は同一プロジェクトでの併用が想定されていないため、パッケージを分けてあります。
 
+Material／Texture の編集と Fallback／Quest 表示比較は、書き込み可能であることを Inspect から分離した `io.github.sabas0ba.sabatools.avatar-materials` を使用してください。このパッケージは core へ依存せず、Inspect の非破壊性を変更しません。
+
 ## 使い方
 
 1. `Tools > SabaTools > Inspect Window` を開く
