@@ -1,7 +1,7 @@
 {
   "name": "io.github.sabas0ba.sabatools.avatar",
   "displayName": "SabaTools Inspect for Avatars",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "unity": "2022.3",
   "description": "SabaTools Inspect にアバター固有の検査を追加します。VRCAvatarDescriptor を実際の型で読み、Expression Parameters のビット消費 (256 上限)、Expression Menu の構造、Playable Layers、ViewPosition、Lipsync / Eye Look の設定、PhysBone の実効チェーンを検査します。アバター用プロジェクトにのみ導入してください。",
   "author": {
