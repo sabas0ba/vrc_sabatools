@@ -58,3 +58,7 @@ if (report.ErrorCount > 0) { Debug.LogError(report.ToMarkdown()); }
 ## 動作環境
 
 Unity 2022.3 (VRChat 推奨バージョン準拠)。Editor 専用アセンブリのみで構成され、ビルド成果物には何も含まれません。
+
+## ライセンス
+
+本パッケージは Apache License 2.0 で提供します。全文は [LICENSE.md](LICENSE.md) を参照してください。外部依存・モデル・素材には、それぞれの配布元のライセンスが適用されます。

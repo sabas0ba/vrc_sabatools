@@ -9,7 +9,7 @@
     "url": "https://github.com/sabas0ba"
   },
   "license": "Apache-2.0",
-  "licensesUrl": "https://github.com/sabas0ba/vrc_sabatools/blob/main/LICENSE",
+  "licensesUrl": "https://www.apache.org/licenses/LICENSE-2.0",
   "documentationUrl": "https://sabas0ba.github.io/vrc_sabatools/docs/io.github.sabas0ba.sabatools.avatar-materials/index.html",
   "changelogUrl": "https://sabas0ba.github.io/vrc_sabatools/docs/io.github.sabas0ba.sabatools.avatar-materials/changelog.html",
   "vpmDependencies": {

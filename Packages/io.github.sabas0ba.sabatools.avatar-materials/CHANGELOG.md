@@ -2,6 +2,12 @@
 
 このファイルは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) の形式に基づきます。
 
+## [Unreleased]
+
+### Changed
+
+- Apache-2.0 の宣言、公式ライセンスURL、同梱するライセンス全文と README の表記を統一。
+
 ## [0.2.0] - 2026-09-01
 
 ### Added
