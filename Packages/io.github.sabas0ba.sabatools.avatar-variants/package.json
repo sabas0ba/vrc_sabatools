@@ -1,0 +1,26 @@
+{
+  "name": "io.github.sabas0ba.sabatools.avatar-variants",
+  "displayName": "SabaTools Avatar Variants",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "Scene中で複製して改変したVRChatアバターを比較し、元のアバターをBase Prefab、改変側をそのPrefab Variantへ変換して差分を管理します。",
+  "author": {
+    "name": "sabas0ba",
+    "url": "https://github.com/sabas0ba"
+  },
+  "license": "Apache-2.0",
+  "licensesUrl": "https://www.apache.org/licenses/LICENSE-2.0",
+  "documentationUrl": "https://sabas0ba.github.io/vrc_sabatools/docs/io.github.sabas0ba.sabatools.avatar-variants/index.html",
+  "changelogUrl": "https://sabas0ba.github.io/vrc_sabatools/docs/io.github.sabas0ba.sabatools.avatar-variants/changelog.html",
+  "vpmDependencies": {
+    "com.vrchat.avatars": ">=3.10.4"
+  },
+  "keywords": [
+    "vrchat",
+    "avatar",
+    "prefab",
+    "variant",
+    "diff",
+    "editor"
+  ]
+}

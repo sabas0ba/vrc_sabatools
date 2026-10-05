@@ -32,6 +32,7 @@ https://sabas0ba.github.io/vrc_sabatools/index.json
 | `io.github.sabas0ba.sabatools.core` | SabaTools Inspect Core | なし | 統計、Missing 参照の検出、レポート出力。単体で完結します |
 | `io.github.sabas0ba.sabatools.avatar` | SabaTools Inspect for Avatars | `com.vrchat.avatars` | `VRCAvatarDescriptor` を型で読む検査を追加します |
 | `io.github.sabas0ba.sabatools.avatar-materials` | SabaTools Avatar Material Studio | `com.vrchat.avatars`、`jp.lilxyzw.liltoon` | Material／Texture編集、照明・Fallback・Quest・Render Queue・Bounds preview |
+| `io.github.sabas0ba.sabatools.avatar-variants` | SabaTools Avatar Variants | `com.vrchat.avatars` | 複製改変されたアバターの差分抽出とPrefab Variant化（開発中） |
 | `io.github.sabas0ba.sabatools.world` | SabaTools Inspect for Worlds | `com.vrchat.worlds` | `VRCSceneDescriptor` を型で読む検査を追加します |
 
 **どれを入れるか**: 非破壊検査はアバター用プロジェクトなら `avatar`、ワールド用なら `world` を入れてください。`core` は依存として自動的に入ります。Material 編集と表示比較が必要なアバタープロジェクトには `avatar-materials` を追加します。これは Inspect へ依存せず単独でも導入できます。`avatar` と `world` を同時に入れる必要はなく、入れると両方の SDK がプロジェクトへ引き込まれます。
@@ -62,6 +63,7 @@ core は両モジュールのアセンブリを参照しません。`InspectionM
 │   │       └── *.cs                # Unity に依存する収集器とウィンドウ、拡張点
 │   ├── io.github.sabas0ba.sabatools.avatar/
 │   ├── io.github.sabas0ba.sabatools.avatar-materials/
+│   ├── io.github.sabas0ba.sabatools.avatar-variants/
 │   └── io.github.sabas0ba.sabatools.world/
 ├── Website/                        # GitHub Pages で公開するリスティングサイト
 ├── docs/design.md                  # package境界・非破壊性・検証階層の設計文書

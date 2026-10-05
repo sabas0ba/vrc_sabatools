@@ -39,6 +39,7 @@ container 内で実行する。Windows の Host tool は Podman と Unity のみ
 | `sabatools.core` | なし | 収集・レポート・ウィンドウ・拡張点 |
 | `sabatools.avatar` | core, `com.vrchat.avatars` | `VRCAvatarDescriptor` を型で読む検査 |
 | `sabatools.avatar-materials` | `com.vrchat.avatars`、`jp.lilxyzw.liltoon` | Material／Texture編集と非保存Preview |
+| `sabatools.avatar-variants` | `com.vrchat.avatars` | 複製改変されたアバターの差分抽出とPrefab Variant化 |
 | `sabatools.world` | core, `com.vrchat.worlds` | `VRCSceneDescriptor` を型で読む検査 |
 
 avatar-materialsのcamera移動、Render Queue filter、半透明probe、bounds overlayは
