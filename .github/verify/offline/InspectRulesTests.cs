@@ -12,6 +12,7 @@
 using System;
 using System.Collections.Generic;
 using SabaTools.AvatarMaterials;
+using SabaTools.AvatarVariants;
 using SabaTools.Inspect;
 using SabaTools.Inspect.Avatar;
 using SabaTools.Inspect.World;
@@ -50,6 +51,14 @@ internal static class InspectRulesTests
         ExplicitFallbackTagsTakePriority();
         LegacyFallbackHeuristicsRemainDeterministic();
         QuestShaderAllowListRejectsPcOnlyVariants();
+        UneditedDuplicatesHaveNoDifferences();
+        PropertyEditsCarryBothValues();
+        AddedAndRemovedObjectsAndComponentsAreClassified();
+        ComponentsOfOneTypeArePairedInOrder();
+        PlacementIsComparedBelowTheRoot();
+        EditsUnderRepeatedSiblingNamesBlockConversion();
+        RenamesAndMovesAreReportedAsRemovalAndAddition();
+        ReorderingIsReportedAndInsertionIsNot();
 
         if (_failures > 0)
         {
@@ -58,6 +67,242 @@ internal static class InspectRulesTests
         }
         Console.WriteLine("ok: all offline checks passed");
         return 0;
+    }
+
+    // -----------------------------------------------------------------------
+    // Avatar Variants hierarchy comparison
+    // -----------------------------------------------------------------------
+
+    private static void UneditedDuplicatesHaveNoDifferences()
+    {
+        // Two copies standing side by side differ in root name and placement
+        // without having been edited.
+        SnapshotNode first = VariantAvatar("Avatar");
+        SnapshotNode second = VariantAvatar("Avatar (1)");
+        Component(first, "UnityEngine.Transform", "m_LocalPosition.x", "0", "m_LocalScale.x", "1");
+        Component(second, "UnityEngine.Transform", "m_LocalPosition.x", "2", "m_LocalScale.x", "1");
+
+        HierarchyDiff diff = HierarchyDiffer.Compare(first, second);
+
+        IsTrue(diff.IsIdentical, "unedited duplicates are identical");
+        AreEqual(0, ConversionPrecheck.Evaluate(diff).Count, "unedited duplicates raise no issue");
+    }
+
+    private static void PropertyEditsCarryBothValues()
+    {
+        SnapshotNode derived = VariantAvatar("Derived");
+        SnapshotNode body = Find(derived, "Body");
+        body.Components.Clear();
+        Component(body, "UnityEngine.BoxCollider", "m_Size.x", "2", "m_Extra", "1");
+
+        HierarchyDiff diff = HierarchyDiffer.Compare(VariantAvatar("Base"), derived);
+
+        AreEqual(2, diff.Changes.Count, "one edited and one new property");
+        HierarchyChange edited = diff.Changes[0];
+        AreEqual(HierarchyChangeKind.PropertyChanged, edited.Kind, "edit kind");
+        AreEqual("Body", edited.Path, "edit path");
+        AreEqual("UnityEngine.BoxCollider", edited.ComponentType, "edit component");
+        AreEqual("m_Size.x", edited.PropertyPath, "edit property");
+        AreEqual("1", edited.BaseValue, "edit base value");
+        AreEqual("2", edited.DerivedValue, "edit derived value");
+        AreEqual(null, diff.Changes[1].BaseValue, "a property only the derived side has");
+        AreEqual("1", diff.Changes[1].DerivedValue, "its derived value");
+    }
+
+    private static void AddedAndRemovedObjectsAndComponentsAreClassified()
+    {
+        SnapshotNode derived = VariantAvatar("Derived");
+        SnapshotNode hips = Find(derived, "Armature/Hips");
+        hips.Children.RemoveAt(1);
+        Find(derived, "Armature/Hips/Spine").Children.Add(new SnapshotNode("Accessory"));
+        Component(hips, "UnityEngine.SphereCollider");
+        Find(derived, "Body").Components.Clear();
+
+        HierarchyDiff diff = HierarchyDiffer.Compare(VariantAvatar("Base"), derived);
+
+        AreEqual(4, diff.Changes.Count, "four structural changes");
+        AreEqual(1, diff.Count(HierarchyChangeKind.GameObjectRemoved), "removed GameObject");
+        AreEqual(1, diff.Count(HierarchyChangeKind.GameObjectAdded), "added GameObject");
+        AreEqual(1, diff.Count(HierarchyChangeKind.ComponentAdded), "added component");
+        AreEqual(1, diff.Count(HierarchyChangeKind.ComponentRemoved), "removed component");
+        IsTrue(
+            HasChange(diff, HierarchyChangeKind.GameObjectRemoved, "Armature/Hips/Tail"),
+            "removed GameObject path");
+        IsTrue(
+            HasChange(diff, HierarchyChangeKind.GameObjectAdded, "Armature/Hips/Spine/Accessory"),
+            "added GameObject path");
+        IsTrue(
+            ConversionPrecheck.CanConvert(ConversionPrecheck.Evaluate(diff)),
+            "additions and removals do not block conversion");
+    }
+
+    private static void ComponentsOfOneTypeArePairedInOrder()
+    {
+        SnapshotNode baseRoot = new SnapshotNode("Base");
+        Component(baseRoot, "UnityEngine.BoxCollider", "m_Size.x", "1");
+        Component(baseRoot, "UnityEngine.BoxCollider", "m_Size.x", "1");
+        SnapshotNode derived = new SnapshotNode("Derived");
+        Component(derived, "UnityEngine.BoxCollider", "m_Size.x", "1");
+        Component(derived, "UnityEngine.BoxCollider", "m_Size.x", "5");
+        Component(derived, "UnityEngine.BoxCollider", "m_Size.x", "1");
+
+        HierarchyDiff diff = HierarchyDiffer.Compare(baseRoot, derived);
+
+        AreEqual(2, diff.Changes.Count, "second collider edited, third added");
+        AreEqual(HierarchyChangeKind.PropertyChanged, diff.Changes[0].Kind, "second collider kind");
+        AreEqual(1, diff.Changes[0].ComponentIndex, "second collider index");
+        AreEqual(HierarchyChangeKind.ComponentAdded, diff.Changes[1].Kind, "third collider kind");
+        AreEqual(2, diff.Changes[1].ComponentIndex, "third collider index");
+    }
+
+    private static void PlacementIsComparedBelowTheRoot()
+    {
+        SnapshotNode baseRoot = VariantAvatar("Base");
+        SnapshotNode derived = VariantAvatar("Derived");
+        Component(Find(baseRoot, "Armature/Hips"), "UnityEngine.Transform", "m_LocalPosition.y", "0");
+        Component(Find(derived, "Armature/Hips"), "UnityEngine.Transform", "m_LocalPosition.y", "0.5");
+
+        HierarchyDiff diff = HierarchyDiffer.Compare(baseRoot, derived);
+
+        AreEqual(1, diff.Changes.Count, "a moved bone is an edit");
+        AreEqual("Armature/Hips", diff.Changes[0].Path, "moved bone path");
+    }
+
+    private static void EditsUnderRepeatedSiblingNamesBlockConversion()
+    {
+        SnapshotNode baseRoot = VariantAvatar("Base");
+        SnapshotNode derived = VariantAvatar("Derived");
+        foreach (SnapshotNode root in new[] { baseRoot, derived })
+        {
+            root.Children.Add(Component(new SnapshotNode("Ribbon"), "UnityEngine.BoxCollider", "m_Size.x", "1"));
+            root.Children.Add(Component(new SnapshotNode("Ribbon"), "UnityEngine.BoxCollider", "m_Size.x", "1"));
+        }
+
+        HierarchyDiff unedited = HierarchyDiffer.Compare(baseRoot, derived);
+        IsTrue(unedited.IsIdentical, "repeated names alone are not a difference");
+        IsTrue(
+            ConversionPrecheck.CanConvert(ConversionPrecheck.Evaluate(unedited)),
+            "repeated names alone do not block conversion");
+
+        SnapshotNode second = derived.Children[derived.Children.Count - 1];
+        second.Components.Clear();
+        Component(second, "UnityEngine.BoxCollider", "m_Size.x", "3");
+
+        HierarchyDiff diff = HierarchyDiffer.Compare(baseRoot, derived);
+        List<ConversionIssue> issues = ConversionPrecheck.Evaluate(diff);
+
+        AreEqual("Ribbon[1]", diff.Changes[0].Path, "the second sibling is addressed by occurrence");
+        AreEqual(1, issues.Count, "one issue for the edited sibling");
+        AreEqual(ConversionIssueKind.AmbiguousSiblings, issues[0].Kind, "issue kind");
+        AreEqual(ConversionIssueSeverity.Blocking, issues[0].Severity, "issue severity");
+        AreEqual("Ribbon[1]", issues[0].Path, "issue path");
+        IsFalse(ConversionPrecheck.CanConvert(issues), "an edit under repeated names blocks conversion");
+    }
+
+    private static void RenamesAndMovesAreReportedAsRemovalAndAddition()
+    {
+        SnapshotNode renamed = VariantAvatar("Derived");
+        SnapshotNode body = Find(renamed, "Body");
+        renamed.Children.Remove(body);
+        renamed.Children.Add(Component(new SnapshotNode("Body_Edited"), "UnityEngine.BoxCollider", "m_Size.x", "9"));
+
+        List<ConversionIssue> renameIssues =
+            ConversionPrecheck.Evaluate(HierarchyDiffer.Compare(VariantAvatar("Base"), renamed));
+
+        AreEqual(1, renameIssues.Count, "one rename");
+        AreEqual(ConversionIssueKind.LikelyRenamed, renameIssues[0].Kind, "rename kind");
+        AreEqual("Body", renameIssues[0].Path, "rename source");
+        AreEqual("Body_Edited", renameIssues[0].RelatedPath, "rename target");
+        IsTrue(ConversionPrecheck.CanConvert(renameIssues), "a rename does not block conversion");
+
+        SnapshotNode moved = VariantAvatar("Derived");
+        SnapshotNode hips = Find(moved, "Armature/Hips");
+        SnapshotNode tail = hips.Children[1];
+        hips.Children.Remove(tail);
+        Find(moved, "Armature/Hips/Spine").Children.Add(tail);
+
+        List<ConversionIssue> moveIssues =
+            ConversionPrecheck.Evaluate(HierarchyDiffer.Compare(VariantAvatar("Base"), moved));
+
+        AreEqual(1, moveIssues.Count, "one move");
+        AreEqual(ConversionIssueKind.LikelyMoved, moveIssues[0].Kind, "move kind");
+        AreEqual("Armature/Hips/Tail", moveIssues[0].Path, "move source");
+        AreEqual("Armature/Hips/Spine/Tail", moveIssues[0].RelatedPath, "move target");
+
+        // An unrelated removal and addition are not paired.
+        SnapshotNode replaced = VariantAvatar("Derived");
+        replaced.Children.Remove(Find(replaced, "Body"));
+        replaced.Children.Add(new SnapshotNode("Hat"));
+        AreEqual(
+            0,
+            ConversionPrecheck.Evaluate(HierarchyDiffer.Compare(VariantAvatar("Base"), replaced)).Count,
+            "objects of different shape are not a rename");
+    }
+
+    private static void ReorderingIsReportedAndInsertionIsNot()
+    {
+        SnapshotNode inserted = VariantAvatar("Derived");
+        inserted.Children.Insert(1, new SnapshotNode("Outfit"));
+        HierarchyDiff insertion = HierarchyDiffer.Compare(VariantAvatar("Base"), inserted);
+        AreEqual(1, insertion.Changes.Count, "an insertion is one addition");
+        AreEqual(0, insertion.Count(HierarchyChangeKind.ChildrenReordered), "an insertion is not a reorder");
+
+        SnapshotNode reordered = VariantAvatar("Derived");
+        reordered.Children.Reverse();
+        HierarchyDiff diff = HierarchyDiffer.Compare(VariantAvatar("Base"), reordered);
+        List<ConversionIssue> issues = ConversionPrecheck.Evaluate(diff);
+
+        AreEqual(1, diff.Changes.Count, "a reorder is one change");
+        AreEqual(HierarchyChangeKind.ChildrenReordered, diff.Changes[0].Kind, "reorder kind");
+        AreEqual(string.Empty, diff.Changes[0].Path, "the reorder is reported on the parent");
+        AreEqual(ConversionIssueKind.ChildrenReordered, issues[0].Kind, "reorder issue");
+        AreEqual(ConversionIssueSeverity.Warning, issues[0].Severity, "reorder severity");
+    }
+
+    private static SnapshotNode VariantAvatar(string name)
+    {
+        var root = new SnapshotNode(name);
+        var armature = new SnapshotNode("Armature");
+        var hips = new SnapshotNode("Hips");
+        hips.Children.Add(new SnapshotNode("Spine"));
+        hips.Children.Add(new SnapshotNode("Tail"));
+        armature.Children.Add(hips);
+        root.Children.Add(armature);
+        root.Children.Add(Component(new SnapshotNode("Body"), "UnityEngine.BoxCollider", "m_Size.x", "1"));
+        return root;
+    }
+
+    private static SnapshotNode Component(SnapshotNode node, string typeName, params string[] pathsAndValues)
+    {
+        var component = new SnapshotComponent(typeName);
+        for (int index = 0; index + 1 < pathsAndValues.Length; index += 2)
+        {
+            component.Properties.Add(new SnapshotProperty(pathsAndValues[index], pathsAndValues[index + 1]));
+        }
+        node.Components.Add(component);
+        return node;
+    }
+
+    private static SnapshotNode Find(SnapshotNode root, string path)
+    {
+        SnapshotNode current = root;
+        foreach (string name in path.Split('/'))
+        {
+            current = current.Children.Find(child => child.Name == name);
+        }
+        return current;
+    }
+
+    private static bool HasChange(HierarchyDiff diff, HierarchyChangeKind kind, string path)
+    {
+        foreach (HierarchyChange change in diff.Changes)
+        {
+            if (change.Kind == kind && change.Path == path)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // -----------------------------------------------------------------------

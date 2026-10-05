@@ -20,6 +20,7 @@ Unity Undoを記録して実行します。Previewは非保存のPreview Scene�
 | `io.github.sabas0ba.sabatools.core` | なし | Scene走査、共通統計、参照検査、レポート、EditorWindow、拡張点 |
 | `io.github.sabas0ba.sabatools.avatar` | core、Avatars SDK | `VRCAvatarDescriptor`とAvatar固有Assetの検査 |
 | `io.github.sabas0ba.sabatools.avatar-materials` | Avatars SDK、lilToon | Material／Texture編集、照明／Fallback／Quest preview |
+| `io.github.sabas0ba.sabatools.avatar-variants` | Avatars SDK | 複製改変されたアバターの差分抽出とPrefab Variant化 |
 | `io.github.sabas0ba.sabatools.world` | core、Worlds SDK | `VRCSceneDescriptor`とWorld固有Componentの検査 |
 
 依存方向はavatarからcore、worldからcoreへの一方向です。coreはSDK assemblyや両モジュールを
@@ -104,12 +105,12 @@ UIの`Ping`は検査時に収集した位置情報から対象をEditor上で強
 
 | 階層 | 対象 | 現在の件数 |
 | --- | --- | ---: |
-| .NET 8 | 全packageの`Editor/Core` | 28 |
+| .NET 8 | 全packageの`Editor/Core` | 36 |
 | Unity EditMode | coreの収集器と公開API | 18 |
-| Unity + Avatars SDK | Avatar module、Avatar Material Studio | 26 |
+| Unity + Avatars SDK | Avatar module、Avatar Material Studio、Prefab変換APIの挙動 | 39 |
 | Unity + Worlds SDK | World module | 15 |
 
-合計87件です。これにRoslyn compile、documentation render、internal link、manifest、`.meta`、
+合計108件です。これにRoslyn compile、documentation render、internal link、manifest、`.meta`、
 dependency purityの検査を加えます。
 
 CIでUnity licenceが利用可能な場合のみ、Unity workflowはUnity回帰試験を実行します。

@@ -30,14 +30,17 @@ case "$LANE" in
     avatars)
         SDK_PACKAGE="com.vrchat.avatars"
         TOOL_PACKAGE="io.github.sabas0ba.sabatools.avatar"
-        EXTRA_TOOL_PACKAGE="io.github.sabas0ba.sabatools.avatar-materials"
+        EXTRA_TOOL_PACKAGES=(
+            "io.github.sabas0ba.sabatools.avatar-materials"
+            "io.github.sabas0ba.sabatools.avatar-variants"
+        )
         EXTRA_VPM_PACKAGE="jp.lilxyzw.liltoon"
         TESTS="$HERE/Tests/Avatar"
         ;;
     worlds)
         SDK_PACKAGE="com.vrchat.worlds"
         TOOL_PACKAGE="io.github.sabas0ba.sabatools.world"
-        EXTRA_TOOL_PACKAGE=""
+        EXTRA_TOOL_PACKAGES=()
         EXTRA_VPM_PACKAGE=""
         TESTS="$HERE/Tests/World"
         ;;
@@ -84,9 +87,9 @@ replace "$TESTS" "$PROJECT/Assets/SdkTests"
 replace "$REPO/Packages/io.github.sabas0ba.sabatools.core" \
     "$PROJECT/Packages/io.github.sabas0ba.sabatools.core"
 replace "$REPO/Packages/$TOOL_PACKAGE" "$PROJECT/Packages/$TOOL_PACKAGE"
-if [ -n "$EXTRA_TOOL_PACKAGE" ]; then
-    replace "$REPO/Packages/$EXTRA_TOOL_PACKAGE" "$PROJECT/Packages/$EXTRA_TOOL_PACKAGE"
-fi
+for extra in "${EXTRA_TOOL_PACKAGES[@]}"; do
+    replace "$REPO/Packages/$extra" "$PROJECT/Packages/$extra"
+done
 replace "$VPM/com.vrchat.base" "$PROJECT/Packages/com.vrchat.base"
 replace "$VPM/$SDK_PACKAGE" "$PROJECT/Packages/$SDK_PACKAGE"
 if [ -n "$EXTRA_VPM_PACKAGE" ]; then
